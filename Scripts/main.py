@@ -3,10 +3,10 @@ from cleaning import Cleaner
 
 def main():
     path_metrics = "C:/Users/adhn565/Documents/Python_3.10/completo_conAttrs_16_7_25.h5"
-    path_originalData = "Data/patient_data.h5"
-    filename_report = "final_metrics_2.h5"
-    filename_cleanData = "clean_patient_data_2.h5"
-    filename_csvReport = "general_report3.csv"
+    path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
+    filename_report = "C:/Users/adhn565/Documents/Data/final_metrics_2.h5"
+    filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_patient_data_2.h5"
+    filename_csvReport = "C:/Users/adhn565/Documents/Data/general_report3.csv"
     thresholds = {
                 "sp_limit":2,
                 "bmin":50,
