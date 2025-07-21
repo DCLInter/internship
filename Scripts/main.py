@@ -2,7 +2,7 @@ from checker import Checker
 from cleaning import Cleaner
 
 def main():
-    path_metrics = "C:/Users/adhn565/Documents/Python_3.10/completo_conAttrs_16_7_25.h5"
+    path_metrics = "C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5"
     path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
     filename_report = "C:/Users/adhn565/Documents/Data/final_metrics_2.h5"
     filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_patient_data_2.h5"
@@ -18,16 +18,16 @@ def main():
                 }
     
     ### Checking the fiducial points
-    ck = Checker(path_metrics,thresholds)
-    dictScore = ck.metrics()
-    df_results = ck.results()
-    ck.report()
-    ck.h5format(filename_report)
+    # ck = Checker(path_metrics,thresholds)
+    # dictScore = ck.metrics()
+    # df_results = ck.results()
+    # ck.report()
+    # ck.h5format(filename_report)
 
     ### Cleaning  the original dataset based on the report of the Checker
     c = Cleaner(filename_report)
     dictFlags = c.detect()
-    clean_data = c.clean(path_originalData)
+    clean_data = c.clean(path_metrics)
     c.csvReport(filename_csvReport)
     c.saveh5(filename_cleanData)
 
