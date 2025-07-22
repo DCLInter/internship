@@ -124,9 +124,10 @@ for patient, data_df in data.items():
         plot(signal,peaks_clean,valleys_clean,show=show,delay=10)
 
     df_bp = pd.DataFrame(list_bp, columns=["SBP","DBP","MAP"])
+    bp_values[patient] = df_bp
     
 print("Fallo completamente: ", a)
-with h5py.File("BP_values.h5","w") as f:
+with h5py.File("BP_values.h5", "w") as f:
     for patient, df in bp_values.items():
         group = f.create_group(patient)
         dataset = group.create_dataset("Bp_values",data= df.T.tonumpy())
