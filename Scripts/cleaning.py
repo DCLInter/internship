@@ -38,18 +38,25 @@ class Cleaner:
         original_ids = {}
         self.clean_data = {}
         self.demo_info = {}
+        self.attributes = {}
 
         with h5py.File(original_datapath, 'r') as f:
             for group_name in f:
                 group = f[group_name]
                 dataset_names = list(group.keys())
-                dataset_names = dataset_names[:]
-                if dataset_names:
-                    original_ids[group_name] = group[dataset_names[0]][1]
-                    original_ids[group_name] = original_ids[group_name][:len(original_ids[group_name])//2]
-                    self.original_data[group_name] = group[dataset_names[0]][:].T
-                    self.original_data[group_name] = self.original_data[group_name][:len(self.original_data[group_name])//2]
-                    self.original_data[group_name] = pd.DataFrame(self.original_data[group_name],index=original_ids[group_name])
+                original_ids[group_name] = group[dataset_names[0]][1]
+                original_ids[group_name] = original_ids[group_name][:len(original_ids[group_name])//2]
+                self.original_data[group_name] = {}
+                self.attributes[group_name] = {}
+                for dst_name in group:
+                    self.original_data[group_name][dst_name] = group[dst_name][:].T
+                    self.original_data[group_name][dst_name] = self.original_data[group_name][dst_name][:len(self.original_data[group_name][dst_name])//2]
+                    self.original_data[group_name][dst_name] = pd.DataFrame(self.original_data[group_name][dst_name],index=original_ids[group_name])
+                    attribute = {}
+                    for attr_name, value in f[group_name][dst_name].attrs.items():
+                        vdecode = [v.decode() if isinstance(v, bytes) else v for v in value]
+                        attribute[attr_name] = vdecode
+                    self.attributes[group_name][dst_name] = attribute
 
                 if group_name not in self.demo_info:
                     self.demo_info[group_name] = {}
@@ -64,7 +71,8 @@ class Cleaner:
             sig_rem = np.array(remove[patient])
             ids = np.array(self.ids[patient])
             target = np.isin(ids,sig_rem)
-            clean_data[patient] = clean_data[patient].drop(clean_data[patient].index[target])
+            for dst in clean_data[patient].keys():
+                clean_data[patient][dst] = clean_data[patient][dst].drop(clean_data[patient][dst].index[target])
 
         self.clean_data = clean_data
 
@@ -75,9 +83,14 @@ class Cleaner:
         print("Saving in: ",filename)
         data = self.clean_data
         with h5py.File(filename, 'w') as f:
-            for patient, df in data.items():
+            for patient in data.keys():
                 grp = f.create_group(patient)
-                grp.create_dataset("Signals", data=df.T.to_numpy())
+                datasets = data[patient]
+                for dst, df in datasets.items():
+                    dataset = grp.create_dataset(dst, data=df.T.to_numpy(dtype = float, na_value = np.nan))
+                    attributes = self.attributes[patient][dst]
+                    for attr, value in attributes.items():
+                        dataset.attrs[attr] = value
                 # Save column names and index as attributes
                 for attrs, value in self.demo_info[patient].items():
                     if isinstance(value, str):
