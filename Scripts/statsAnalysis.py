@@ -13,7 +13,7 @@ from sklearn.ensemble import IsolationForest
 data = {}
 segment_ids = {}
 listaFinal = []
-data_path = 'C:/Users/adhn565/OneDrive - City, University of London/Python_3.10/full_features_4_7_2025.h5'
+data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
 
 if data_path=="":
     sig_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
@@ -163,10 +163,32 @@ def boxMedians(savefolder:str,dataset:str):
         # plt.show()
         plt.close()
 
-def analysis_feat(patient:str ,feature: int, dataset: str):
+def isolationForest(data: dict):
+    # For isolation forest its a really good tool for identifying outliers wit multiple variables (in this case we are inputing all the features)
+    ot_isf = pd.DataFrame(index=data.keys())
+    for patient in data.keys():
+        print(patient)
+        datasets = list(data[patient].keys())
+        npData = data[patient][datasets[0]]
+        x = pd.DataFrame(npData.T,columns=features)
+        # Drop NaNs for Isolation Forest
+        x_clean = x.dropna()
+        isl = IsolationForest(contamination= "auto", random_state=42)
+        isl.fit(x_clean)
+        labels = isl.predict(x_clean)
+        # Create a full labels array with NaN for dropped indices
+        full_labels = pd.Series(np.nan, index=x.index)
+        full_labels[x_clean.index] = labels  #I got the outliers labels (1,-1) for the original dataset, the nan value mantains but for the plot it doesnt matter (the plot ignores it)
+        outliers_iso = x[full_labels == -1]
+        amountOut = (len(outliers_iso)/len(x))*100
+        ot_isf[patient] = amountOut
+    ot_isf.to_csv("outliers_isolationForest.csv")
+
+def analysis_feat(patient:str ,feature: int, dataset: str, stats_data: pd.DataFrame, outliers_data: pd.DataFrame):
     x = data[patient][dataset+"_"+patient][feature]
     x = pd.Series(x)
     n = len(x)
+    print(features[feature],n)
 
     if (x.isna()).any():
         l = x.isna().sum()
@@ -218,89 +240,26 @@ def analysis_feat(patient:str ,feature: int, dataset: str):
     perc_75 = x.quantile(0.75)
     pvalue = normt.pvalue
     other = pd.DataFrame([kurt,skew,iqr,std,mean,median,nt,pvalue,n],index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"],columns=[f"{features[feature]}"])
-    full_data[other.columns[0]]=other
+    stats_data[other.columns[0]]=other
 
     ### Outliers (by IQR method, MAD method and Isolation forest)
     low = perc_25 - 1.5*iqr
     high = perc_75 + 1.5*iqr
     outliers_iqr = x[(x<low)|(x>high)]
     amountOut = (len(outliers_iqr)/len(x))*100
-    out_all.loc["IQR",features[feature]] = amountOut
+    outliers_data.loc["IQR",features[feature]] = amountOut
 
     MAD = sc.median_abs_deviation(x)
     MAD = (x-median)/MAD 
     outliers_mad = x[abs(MAD)>3]
     amountOut = (len(outliers_mad)/len(x))*100
-    out_all.loc["MAD",features[feature]] = amountOut
-
-    # Drop NaNs for Isolation Forest
-    x_no_nan = x.dropna()
-    y = x_no_nan.to_frame()
-    isl = IsolationForest(contamination= "auto", random_state=42)
-    isl.fit(y)
-    labels = isl.predict(y)
-    # Create a full labels array with NaN for dropped indices
-    full_labels = pd.Series(np.nan, index=x.index)
-    full_labels[x_no_nan.index] = labels                #I got the outliers labels (1,-1) for the original dataset, the nan value mantains but for the plot it doesnt matter (the plot ignores it)
-    outliers_iso = x[full_labels == -1]
-    amountOut = (len(outliers_iso)/len(x))*100
-    out_all.loc["IsolationForest",features[feature]] = amountOut
+    outliers_data.loc["MAD",features[feature]] = amountOut
     
     comparison_df = pd.DataFrame({
     'value': x,
-    'is_outlier_iso': full_labels == -1,
     'is_outlier_mad': x.isin(outliers_mad),
     'is_outlier_iqr': x.isin(outliers_iqr)
     })
-
-    plt.figure(figsize=(12, 6))
-    # plt.plot(x.values, 'ko', label='Data')
-    # plt.plot(comparison_df[comparison_df.is_outlier_iso].index,
-    #         comparison_df[comparison_df.is_outlier_iso].value, 'ro', label='Isolation Forest')
-    # plt.plot(comparison_df[comparison_df.is_outlier_mad].index,
-    #         comparison_df[comparison_df.is_outlier_mad].value, 'bx', label='MAD')
-    # plt.plot(comparison_df[comparison_df.is_outlier_iqr].index,
-    #         comparison_df[comparison_df.is_outlier_iqr].value, 'g^', label='IQR')
-    # plt.plot(x.values, 'ko', label='Data')
-
-    # plt.hist(x, bins=60, color="black", label='Data')
-    # plt.hist(comparison_df[comparison_df.is_outlier_iso].value, bins=80, color="red", label='Isolation Forest')
-    # plt.hist(comparison_df[comparison_df.is_outlier_mad].value, bins=80, color="skyblue", label='MAD')
-    # plt.hist(comparison_df[comparison_df.is_outlier_iqr].value, bins=80, color="green", label='IQR')
-    
-    # # Plot all data points (normal + outliers) as background
-    # plt.scatter(x.index, x.values, color='gray', marker='o', label='Normal Data', alpha=0.5)
-    # # Overlay outliers detected by each method
-    # plt.scatter(comparison_df[comparison_df.is_outlier_iso].index,
-    #             comparison_df[comparison_df.is_outlier_iso].value,
-    #             color='red', marker='o', label='Isolation Forest')
-    # plt.scatter(comparison_df[comparison_df.is_outlier_mad].index,
-    #             comparison_df[comparison_df.is_outlier_mad].value,
-    #             color='skyblue', marker='x', label='MAD')
-    # plt.scatter(comparison_df[comparison_df.is_outlier_iqr].index,
-    #             comparison_df[comparison_df.is_outlier_iqr].value,
-    #             color='green', marker='^', label='IQR')
-
-    # value_counts = x.value_counts().sort_index()
-    # # Outlier value counts for each method
-    # outlier_counts_iso = comparison_df[comparison_df.is_outlier_iso].value.value_counts().sort_index()
-    # outlier_counts_mad = comparison_df[comparison_df.is_outlier_mad].value.value_counts().sort_index()
-    # outlier_counts_iqr = comparison_df[comparison_df.is_outlier_iqr].value.value_counts().sort_index()
-    # plt.scatter(value_counts.index, value_counts.values, color='gray', marker='o', label='All Data', alpha=0.5)
-    # plt.scatter(outlier_counts_iso.index, outlier_counts_iso.values, color='red', marker='o', label='Isolation Forest')
-    # plt.scatter(outlier_counts_mad.index, outlier_counts_mad.values, color='skyblue', marker='x', label='MAD')
-    # plt.scatter(outlier_counts_iqr.index, outlier_counts_iqr.values, color='green', marker='^', label='IQR')
-
-    plt.legend()
-    plt.title(f"Outlier Detection of {features[feature]}: Isolation Forest vs MAD vs IQR")
-    plt.xlabel("Index")
-    plt.ylabel("Value")
-    plt.grid(True)
-    plt.tight_layout()
-    # plt.show()
-    # sp = os.path.join(save_outs,f"{features[feature]}")
-    # plt.savefig(sp)
-    plt.close()
     
     ### Show boxplots
     bxpstatsmean = [{'whishi': mean+std,
@@ -325,48 +284,45 @@ def analysis_feat(patient:str ,feature: int, dataset: str):
     # plt.show()
     plt.close()
 
-    # fig, ax = plt.subplots(figsize=(6,6))
-    # ax.bxp(bxpstatsmean, patch_artist=True, boxprops=dict(facecolor='lightgreen'), whiskerprops=dict(color="red"), capprops=dict(color="red"))
-    # sp = os.path.join(save_BP,f"{features[feature]}_BP2")
-    # plt.savefig(sp)
-    # plt.tight_layout()
-    # plt.show()
-    # plt.close()
+    return stats_data,outliers_data
 
 
-savefolder = "c:/Users/adhn565/Documents/Stats_50"
-# normal_feats = {}
-# for p in data.keys():
-#     save_folder = os.path.join(savefolder,p)
-#     os.makedirs(save_folder, exist_ok=True)
-#     full_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
-#     out_all = pd.DataFrame(index=["IQR","MAD","IsolationForest"])
-#     print(p)
-#     normal_feats[p] = {"mean":[],"median":[]}
-#     for d in list(data[p].keys())[:2]:
-#         nf = 0
-#         save_QQ = os.path.join(save_folder,"QQplots_" + d.replace("_"+p,""))
-#         save_BP = os.path.join(save_folder,"BoxPlots_" + d.replace("_"+p,""))
-#         save_hist = os.path.join(save_folder,"Histograms_" + d.replace("_"+p,""))
-#         save_outs = os.path.join(save_folder,"Outliers_" + d.replace("_"+p,""))
-#         os.makedirs(save_BP, exist_ok=True)
-#         os.makedirs(save_QQ, exist_ok=True)
-#         os.makedirs(save_hist, exist_ok=True)
-#         os.makedirs(save_outs, exist_ok=True)
-#         QQplot_all(p,save_QQ, dataset=d)
-#         Hist_all(p,save_hist,dataset=d)
-#         for f in range(0,len(features)):
-#             analysis_feat(patient=p,feature=f,dataset="median")
-#         full_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
-#         out_all.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
-#         # normal_feats[p][d.replace("_"+p,"")].append(nf)
-#     # df_nf = pd.DataFrame(normal_feats)
-#     # df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
+savefolder = "c:/Users/adhn565/Documents/Stats_new"
+normal_feats = {}
+for p in data.keys():
+    save_folder = os.path.join(savefolder,p)
+    os.makedirs(save_folder, exist_ok=True)
+    full_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
+    out_all = pd.DataFrame(index=["IQR","MAD"])
+    print(p)
+    normal_feats[p] = {"mean":[],"median":[]}
+    for d in list(data[p].keys())[:2]:
+        nf = 0
+        save_QQ = os.path.join(save_folder,"QQplots_" + d.replace("_"+p,""))
+        save_BP = os.path.join(save_folder,"BoxPlots_" + d.replace("_"+p,""))
+        save_hist = os.path.join(save_folder,"Histograms_" + d.replace("_"+p,""))
+        
+        os.makedirs(save_BP, exist_ok=True)
+        os.makedirs(save_QQ, exist_ok=True)
+        os.makedirs(save_hist, exist_ok=True)
+
+        QQplot_all(p,save_QQ, dataset=d)
+        Hist_all(p,save_hist,dataset=d)
+        for f in range(0,len(features)):
+            st_data,ot_data = analysis_feat(patient=p,feature=f,dataset="median",stats_data=full_data,outliers_data=out_all)
+        st_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
+        ot_data.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
+        normal_feats[p][d.replace("_"+p,"")].append(nf)
+    df_nf = pd.DataFrame(normal_feats)
+    df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
+
 def plot_overPatients():
     for d in ["mean","median"]:
         hisMedians(savefolder=savefolder,dataset=d)
         boxMedians(savefolder=savefolder,dataset=d)
+
 plot_overPatients()
+isolationForest()
 # hisMedians()
 # x = search_feat("PRV")
 # analysis_feat("p000001",x)

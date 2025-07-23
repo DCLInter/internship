@@ -130,5 +130,5 @@ print("Fallo completamente: ", a)
 with h5py.File("BP_values.h5", "w") as f:
     for patient, df in bp_values.items():
         group = f.create_group(patient)
-        dataset = group.create_dataset("Bp_values",data= df.T.tonumpy())
+        dataset = group.create_dataset("Bp_values",data= df.T.to_numpy())
         
