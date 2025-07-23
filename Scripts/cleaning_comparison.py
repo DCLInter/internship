@@ -136,6 +136,7 @@ def byPatient(data: dict, data_clean: dict, features_names: list):
 
 def byFeature_medians(data: dict, data_clean: dict, features_names: list):
     median_all = {}
+    number_overlap = {}
     ft_names = features_names
     for f in ft_names:
         feat_values = []
@@ -163,9 +164,33 @@ def byFeature_medians(data: dict, data_clean: dict, features_names: list):
 
         overlap_iqr = np.where(otl_idx_x["IQR"] == otl_idx_y["IQR"])[0]
         overlap_mad = np.where(otl_idx_x["MAD"] == otl_idx_y["MAD"])[0]
-        
+
+        overlap_score_iqr = 0
+        if len(overlap_iqr) > 0:
+            v1 = otl_val_x["IQR"]
+            v2 = otl_val_y["IQR"]
+            total = len(v1) + len(v2)
+            if v1.size == 0 or v2.size == 0:
+                pass
+            else:
+                n = len(overlap_iqr)
+                overlap_score_iqr = n/total
+        overlap_score_mad = 0
+        if len(overlap_mad) > 0:
+            v1 = otl_val_x["MAD"]
+            v2 = otl_val_y["MAD"]
+            if v1.size == 0 or v2.size == 0:
+                pass
+            else:
+                m = len(overlap_mad)
+                overlap_score_mad = m/(len(v1) + len(v2))
+
+        number_overlap[f] = {
+            "IQR": overlap_score_iqr,
+            "MAD": overlap_score_mad
+        }
     
-    return median_all
+    return median_all, number_overlap
 
 def byFeature_all(data: dict, data_clean: dict, features_names: list):
     signals_all = {}
