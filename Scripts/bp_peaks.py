@@ -106,14 +106,12 @@ for patient, data_df in data.items():
         
         if len(peaks_clean) == 0:
             SBP = np.nan
-            MAP = (SBP + 2*DBP)/3
         elif len(valleys_clean) == 0:
             DBP = np.nan
-            MAP = (SBP + 2*DBP)/3
         else:
             SBP = np.average(peaks_values)
             DBP = np.average(valleys_values)
-            MAP = (SBP + 2*DBP)/3
+        MAP = np.mean(signal)
         
         list_bp.append([SBP,DBP,MAP])
 
