@@ -17,7 +17,7 @@ from lib_changes import biomarkers2 as BM2 ##Modified
 from tkinter import filedialog
 import scipy.stats
 
-from other_functions import Others ### Class with some other functions
+from Scripts.other_functions_PPG import Others ### Class with some other functions
 
 class Feature_Extraction():
     def __init__(self, data_path: str, h5name: str, csvname: str):
