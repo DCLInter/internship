@@ -13,12 +13,12 @@ from sklearn.ensemble import IsolationForest
 data = {}
 segment_ids = {}
 listaFinal = []
-data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
+data_path = 'C:/Users/adhn565/Documents/Data/data_clean_features.h5'
 
 if data_path=="":
-    sig_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
+    data_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
 else:
-    sig_path=data_path
+    data_path=data_path
 
 # Opens the archive read mode only with h5py
 with h5py.File(data_path, 'r') as f:
@@ -34,7 +34,7 @@ with h5py.File(data_path, 'r') as f:
     fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 
-# data = {k: data[k] for k in ["p000030","p000003","p000005"] if k in data}
+data = {k: data[k] for k in ["p000001","p000003","p000005"] if k in data}
 # data = {k: data[k] for k in list(data.keys())[:50] if k in data}
 # Now, data['p000001']['segment_0'] gives you the numpy array for that dataset
 # And, data['p000001']['mean_p000005'][0] gives you the numpy array for the first row of the dataset
@@ -206,7 +206,7 @@ def analysis_feat(patient:str ,feature: int, dataset: str, stats_data: pd.DataFr
     plt.xlabel('Value')
     plt.ylabel('Frequency')
     plt.tight_layout()
-    # plt.show()
+    plt.show()
     plt.close()
 
     ### Scipy normality test, still recommended to check the QQ plots in the case of large data (samples >300)
@@ -287,7 +287,7 @@ def analysis_feat(patient:str ,feature: int, dataset: str, stats_data: pd.DataFr
     return stats_data,outliers_data
 
 
-savefolder = "c:/Users/adhn565/Documents/Stats_new"
+savefolder = "c:/Users/adhn565/Documents/Stats_clean"
 normal_feats = {}
 for p in data.keys():
     save_folder = os.path.join(savefolder,p)
