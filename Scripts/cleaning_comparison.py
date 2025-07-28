@@ -121,7 +121,7 @@ def byPatient(data: dict, data_clean: dict, features_names: list):
         ft_clean = data_clean[patient][f"mean_{patient}"]
         change_perFeature = {}
         outliers_perFeature = {}
-        change_outliers[patient] = pd.DataFrame(columns=["IQR_change", "MAD_change","numberIQR"])
+        change_outliers[patient] = pd.DataFrame(columns=["IQR_change", "MAD_change"])
 
         for feat in np.arange(len(ft_clean)):
             x_before = ft[feat]
@@ -150,13 +150,16 @@ def byPatient(data: dict, data_clean: dict, features_names: list):
             otl_og_per = (otl_og_size / x_before.size) * 100
             otl_cl_per = (otl_cl_size / x_after.size) * 100
             iqr_change = abs(otl_cl_per - otl_og_per)/otl_og_per * 100 if otl_og_per > 0 else 0
-
+            change_outliers[patient].loc[ft_names[feat],"IQRbef%"] = otl_og_per
+            change_outliers[patient].loc[ft_names[feat],"IQRaft%"] = otl_cl_per
 
             otl_og_size = outliers_original["MAD"].size
             otl_cl_size = outliers_clean["MAD"].size
             otl_og_per = (otl_og_size / x_before.size) * 100
             otl_cl_per = (otl_cl_size / x_after.size) * 100
             mad_change = abs(otl_cl_per - otl_og_per)/otl_og_per * 100 if otl_og_per > 0 else 0
+            change_outliers[patient].loc[ft_names[feat],"MADbef%"] = otl_og_per
+            change_outliers[patient].loc[ft_names[feat],"MADaft%"] = otl_cl_per
 
             change_outliers[patient].loc[ft_names[feat],"IQR_change"] = iqr_change
             change_outliers[patient].loc[ft_names[feat],"MAD_change"] = mad_change
@@ -295,38 +298,39 @@ def byFeature_all(data: dict, data_clean: dict, features_names: list):
         outl_changes.loc[ft,"MAD_change"] = mad_change
 
         ### Overlaps
-        if outliers_original["IQR"].empty or outliers_clean["IQR"].empty or outliers_original["MAD"].empty or outliers_clean["MAD"].empty:
-            overlap_iqr = []
-            overlap_mad = []
-        else:
-            before = np.array(outliers_original["IQR"].index)
-            before_m = np.array(outliers_original["MAD"].index)
-            after = np.array(outliers_clean["IQR"].index)
-            after_m = np.array(outliers_clean["MAD"].index)
-
-            overlap_iqr = np.intersect1d(before, after)
-            overlap_mad = np.intersect1d(before_m, after_m)
+        before = np.array(outliers_original["IQR"].index)
+        before_m = np.array(outliers_original["MAD"].index)
+        after = np.array(outliers_clean["IQR"].index)
+        after_m = np.array(outliers_clean["MAD"].index)
         
         ### Overlap IQR and MAD indexes of the signals and percentages
-        overlap_iqr_idx = outliers_original["IQR"].loc[overlap_iqr,"values"]
-        overlap_mad_idx = outliers_original["MAD"].loc[overlap_mad,"values"]
-        overlap_iqr_percentage = 100*len(overlap_iqr_idx) / len(outliers_original["IQR"])  if len(outliers_original["IQR"]) > 0 else 0
-        overlap_mad_percentage = 100*len(overlap_mad_idx) / len(outliers_original["MAD"]) if len(outliers_original["MAD"]) > 0 else 0
+        overlap_iqr_score = len(set(before) & set(after)) / len(set(before) | set(after))
+        overlap_mad_score = len(set(before_m) & set(after_m)) / len(set(before_m) | set(after_m))
 
         overlaps[ft] = {
-            "overlap_iqr_vals": overlap_iqr_idx,
-            "overlap_mad_vals": overlap_mad_idx,
-            "overlap_iqr": overlap_iqr_percentage,
-            "overlap_mad": overlap_mad_percentage
+            "overlap_iqr": overlap_iqr_score,
+            "overlap_mad": overlap_mad_score
         }
 
     return signals_all, outliers, overlaps, outl_changes
 
-# st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
+st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
 st_ch_med, outl_med, outl_ch_med = byFeature_medians(data,data_clean,features)
 st_ch_all, outl_all, overlap, outl_ch_all = byFeature_all(data,data_clean,features)
-print(outl_med["IPR"]["outliers_original"])
-print(outl_med["IPR"]["outliers_cleaned"])
+
+df_iqr_p = pd.DataFrame(columns=features)
+df_mad_p = pd.DataFrame(columns=features)
+
+for p, df in outl_ch.items():
+    for ft, otl in df.items():
+        df_iqr_p.loc[p, ft] = otl["IQR_change"]
+        df_mad_p.loc[p, ft] = otl["MAD_change"]
+
+        df_iqr_p.loc[p+"_1", ft] = otl["IQRbef%"]
+        df_mad_p.loc[p+"_1", ft] = otl["MADbef%"]
+
+        df_iqr_p.loc[p+"_2", ft] = otl["IQRaft%"]
+        df_mad_p.loc[p+"_2", ft] = otl["MADaft%"]
 
 # filepath = "C:/Users/adhn565/Documents/Data"
 # for p, df in outl_ch.items():
@@ -344,10 +348,10 @@ for ft, stat in st_ch_all.items():
     for stk, stv in stat.items():
         df_stats_all.loc[ft, stk] = stv
 
-overlap_df = pd.DataFrame(columns=["IQR_percentage", "MAD_percentage"], index=overlap.keys())
+overlap_df = pd.DataFrame(columns=["IQR_score", "MAD_score"], index=overlap.keys())
 for ft in overlap.keys():
-    overlap_df.loc[ft, "IQR_percentage"] = overlap[ft]["overlap_iqr"]
-    overlap_df.loc[ft, "MAD_percentage"] = overlap[ft]["overlap_mad"]
+    overlap_df.loc[ft, "IQR_score"] = overlap[ft]["overlap_iqr"]
+    overlap_df.loc[ft, "MAD_score"] = overlap[ft]["overlap_mad"]
 
 # Save the results to Excel files
 dataframes = {

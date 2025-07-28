@@ -111,6 +111,7 @@ for patient, data_df in data.items():
         else:
             SBP = np.average(peaks_values)
             DBP = np.average(valleys_values)
+            
         MAP = np.mean(signal)
         
         list_bp.append([SBP,DBP,MAP])
