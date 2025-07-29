@@ -98,7 +98,9 @@ def cleaningAnalysis(before: np.array,after: np.array):
     ### Statistical distances test (Kolmogorov-Smirnov test)
     ### In this case the null hypothesis for the KS test is that both samples comes from the same distribution
     ks_test, ks_p = scStats.ks_2samp(x,y)
-    ws_test = scStats.wasserstein_distance(x,y)
+    x_clean = x[~np.isnan(x)]
+    y_clean = y[~np.isnan(y)]
+    ws_test = scStats.wasserstein_distance(x_clean,y_clean)
 
     stats_changes = {
         "mean": means_change,
