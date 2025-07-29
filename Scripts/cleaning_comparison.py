@@ -43,10 +43,11 @@ def search_feat(feature:str, features_list: list):
 
 def outliers_IQRandMAD(array):
 
-    median = np.median(array)
-    iqr = scStats.iqr(array,nan_policy="omit")
-    percentile25 = np.percentile(array,25)
-    percentile75 = np.percentile(array,75)
+    median = np.nanmedian(array)
+    iqr = scStats.iqr(array, nan_policy="omit")
+    quantiles = np.nanquantile(array,[0.25,0.75])
+    percentile25 = quantiles[0]
+    percentile75 = quantiles[1]
     mad = scStats.median_abs_deviation(array, nan_policy="omit")
 
     high_limit = percentile75 + iqr*1.5
@@ -67,7 +68,7 @@ def outliers_IQRandMAD(array):
         "IQR": df_outliers_iqr,
         "MAD": df_outliers_mad
     }
-    # print(median,iqr,high_limit,low_limit)
+    
     return outliers
 
 
@@ -79,8 +80,10 @@ def cleaningAnalysis(before: np.array,after: np.array):
     ### change in standart statistics
     means = [np.nanmean(x),np.nanmean(y)]
     median = [np.nanmedian(x),np.nanmedian(y)]
-    percentiles25 = [np.percentile(x,25), np.percentile(y,25)]
-    percentiles75 = [np.percentile(y,75), np.percentile(y,75)]
+    quantiles_before = np.nanquantile(x,[0.25,0.27])
+    quantiles_after = np.nanquantile(y,[0.25,0.27])
+    percentiles25 = [quantiles_before[0], quantiles_after[0]]
+    percentiles75 = [quantiles_before[1], quantiles_after[1]]
     
     means_change = 100*np.diff(means)[0]/means[0] if means[0] != 0 else 0
     median_change = 100*np.diff(median)[0]/median[0] if median[0] != 0 else 0
@@ -95,6 +98,7 @@ def cleaningAnalysis(before: np.array,after: np.array):
     ### Statistical distances test (Kolmogorov-Smirnov test)
     ### In this case the null hypothesis for the KS test is that both samples comes from the same distribution
     ks_test, ks_p = scStats.ks_2samp(x,y)
+    ws_test = scStats.wasserstein_distance(x,y)
 
     stats_changes = {
         "mean": means_change,
@@ -105,6 +109,7 @@ def cleaningAnalysis(before: np.array,after: np.array):
         "MAD": mad_change,
         "KS test": ks_test,
         "KS p-value": ks_p,
+        "Wasserstein_dist": ws_test
     }
 
     return stats_changes
@@ -188,8 +193,8 @@ def byFeature_medians(data: dict, data_clean: dict, features_names: list):
             if x.size == 0 or y.size == 0:
                 continue
 
-            median_x = np.median(x) if x.size != 0 else 0
-            median_y = np.median(y) if y.size != 0 else 0
+            median_x = np.nanmedian(x)
+            median_y = np.nanmedian(y)
 
             feat_values.append(median_x)
             feat_values_clean.append(median_y)
@@ -249,8 +254,7 @@ def byFeature_all(data: dict, data_clean: dict, features_names: list):
         for p in data.keys():
             idx_ft = search_feat(ft,ft_names)
             x = data[p][f"mean_{p}"][idx_ft]
-            if x.size > 10:
-                x = x[:len(x)//2]
+            x = x[:len(x)//2]
             y = data_clean[p][f"mean_{p}"][idx_ft]
 
             if x.size == 0 or y.size == 0:
@@ -303,40 +307,43 @@ def byFeature_all(data: dict, data_clean: dict, features_names: list):
         after = np.array(outliers_clean["IQR"].index)
         after_m = np.array(outliers_clean["MAD"].index)
         
-        ### Overlap IQR and MAD indexes of the signals and percentages
+        ### Jaccard similarity score
         overlap_iqr_score = len(set(before) & set(after)) / len(set(before) | set(after))
         overlap_mad_score = len(set(before_m) & set(after_m)) / len(set(before_m) | set(after_m))
 
         overlaps[ft] = {
-            "overlap_iqr": overlap_iqr_score,
-            "overlap_mad": overlap_mad_score
+            "overlap_iqr": 100*overlap_iqr_score,
+            "overlap_mad": 100*overlap_mad_score
         }
+
+        print("antes",array_before.size,"despues",array_after.size)
 
     return signals_all, outliers, overlaps, outl_changes
 
-st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
+# st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
 st_ch_med, outl_med, outl_ch_med = byFeature_medians(data,data_clean,features)
 st_ch_all, outl_all, overlap, outl_ch_all = byFeature_all(data,data_clean,features)
 
 df_iqr_p = pd.DataFrame(columns=features)
 df_mad_p = pd.DataFrame(columns=features)
 
-for p, df in outl_ch.items():
-    for ft, otl in df.items():
-        df_iqr_p.loc[p, ft] = otl["IQR_change"]
-        df_mad_p.loc[p, ft] = otl["MAD_change"]
+# for p, df in outl_ch.items():
+#     for ft, otl in df.items():
+#         df_iqr_p.loc[p, ft] = otl["IQR_change"]
+#         df_mad_p.loc[p, ft] = otl["MAD_change"]
 
-        df_iqr_p.loc[p+"_1", ft] = otl["IQRbef%"]
-        df_mad_p.loc[p+"_1", ft] = otl["MADbef%"]
+#         df_iqr_p.loc[p+"_1", ft] = otl["IQRbef%"]
+#         df_mad_p.loc[p+"_1", ft] = otl["MADbef%"]
 
-        df_iqr_p.loc[p+"_2", ft] = otl["IQRaft%"]
-        df_mad_p.loc[p+"_2", ft] = otl["MADaft%"]
+#         df_iqr_p.loc[p+"_2", ft] = otl["IQRaft%"]
+#         df_mad_p.loc[p+"_2", ft] = otl["MADaft%"]
 
 # filepath = "C:/Users/adhn565/Documents/Data"
 # for p, df in outl_ch.items():
 #     filename = os.path.join(filepath, f"{p}.xlsx")
 #     to_xslx(df, filename)
 # print(st_ch_med["Av-Au ratio"])
+
 # Create DataFrames for the results
 df_stats_med = pd.DataFrame(index=st_ch_med.keys())
 for ft, stat in st_ch_med.items():
@@ -348,10 +355,10 @@ for ft, stat in st_ch_all.items():
     for stk, stv in stat.items():
         df_stats_all.loc[ft, stk] = stv
 
-overlap_df = pd.DataFrame(columns=["IQR_score", "MAD_score"], index=overlap.keys())
+overlap_df = pd.DataFrame(columns=["IQR(%)", "MAD(%)"], index=overlap.keys())
 for ft in overlap.keys():
-    overlap_df.loc[ft, "IQR_score"] = overlap[ft]["overlap_iqr"]
-    overlap_df.loc[ft, "MAD_score"] = overlap[ft]["overlap_mad"]
+    overlap_df.loc[ft, "IQR(%)"] = overlap[ft]["overlap_iqr"]
+    overlap_df.loc[ft, "MAD(%)"] = overlap[ft]["overlap_mad"]
 
 # Save the results to Excel files
 dataframes = {
@@ -359,9 +366,9 @@ dataframes = {
     "stats_change_all": df_stats_all,
     "outliers_change_only_medians": outl_ch_med,
     "outliers_change_with_all": outl_ch_all,
-    "overlap_change": overlap_df,
+    "overlap_JaccardSimilarity": overlap_df,
 }
-filepath = "C:/Users/adhn565/Documents/Data"
+filepath = ""
 for name, df in dataframes.items():
     filename = os.path.join(filepath, f"{name}.xlsx")
     to_xslx(df, filename)

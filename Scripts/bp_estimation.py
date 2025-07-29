@@ -3,8 +3,9 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 import shap
+from scipy.stats import pearsonr
 from sklearn.model_selection import KFold, GridSearchCV, GroupShuffleSplit, train_test_split, cross_val_score
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, make_scorer
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
@@ -16,17 +17,14 @@ data_target = {}
 segment_ids = {}
 
 def evaluate(true, pred, label):
+    me = np.mean(true - pred)
     mae = mean_absolute_error(true, pred)
+    mse = mean_squared_error(true, pred)
     rmse = np.sqrt(mean_squared_error(true, pred))
-    r2 = r2_score(true, pred)
+    r,_ = pearsonr(true, pred)
+    abs_error = abs(true - pred)
     
-    print(f"{label} — MAE: {mae:.2f}, RMSE: {rmse:.2f}, R²: {r2:.3f}")
-
-def multioutput_mae(y_true, y_pred):
-    return np.mean([
-        mean_absolute_error(y_true[:, i], y_pred[:, i])
-        for i in range(y_true.shape[1])
-    ])
+    print(f"{label} \nPearson: {r:.2f}\nMAE: {mae:.2f} \nME: {me:.2f} \nRMSE: {rmse:.2f} \nMSE: {mse:.3f}")
 
 def SHAPvalues(target_labels: list, model):
     multi_model = model
@@ -100,53 +98,64 @@ y_train = imputer_y.fit_transform(y_train)
 y_test = imputer_y.transform(y_test) 
 
 # Model for multiple targets
-model = lgb.LGBMRegressor(random_state= 42)
+model = lgb.LGBMRegressor(random_state= 42, num_leaves= 50, learning_rate= 0.05, max_depth= 15, n_estimators=1000)
 multi_model = MultiOutputRegressor(model)
 
-# Grid Search (tuning fot the best hyperparameters for my LGBM model)
-# Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__.
-param_grid = {
-    'estimator__learning_rate': [0.05, 0.1],
-    'estimator__n_estimators': [500, 1000],
-    'estimator__max_depth': [10, 15]
-}
-
-# Run cross-validation
-mae_scorer = make_scorer(multioutput_mae, greater_is_better=False) # makes our own score function that averages the MAE for the 3 targets
 cv = KFold(n_splits=5, shuffle=True, random_state=42)
-# scores = cross_val_score(multi_model, X_train, y_train, scoring=mae_scorer, cv=cv)
-grid_search = GridSearchCV(
-    estimator=multi_model,
-    param_grid=param_grid,
-    scoring=mae_scorer,  # or 'r2', 'neg_mean_squared_error'
-    cv=cv,
-    n_jobs=-1,
-    verbose=1
-)
 
-grid_search.fit(X_train, y_train, groups=groups[train_idx])
+# Grid Search (tuning fot the best hyperparameters for my LGBM model)
+# # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__.
+# param_grid = {
+#     'estimator__learning_rate': [0.05, 0.1],
+#     'estimator__n_estimators': [500, 1000],
+#     'estimator__max_depth': [10, 15],
+#     'estimator__num_leaves': [31, 50]
+# }
 
-print("Best parameters:", grid_search.best_params_)
-print("Best MAE:", -grid_search.best_score_)
+# grid_search = GridSearchCV(
+#     estimator=multi_model,
+#     param_grid=param_grid,
+#     scoring= "neg_mean_squared_error",  # or 'r2', 'neg_mean_squared_error'
+#     cv=cv,
+#     n_jobs=-1,
+#     verbose=1
+# )
+
+# grid_search.fit(X_train, y_train, groups=groups[train_idx])
+
+# best_idx = grid_search.best_index_
+# std = grid_search.cv_results_['std_test_score'][best_idx]
+# print("Best parameters:", grid_search.best_params_)
+# print("Best MSE:", -grid_search.best_score_,"+",std)
 
 # best_model = grid_search.best_estimator_
-# y_pred = best_model.predict(X_test)
+
+# Run cross-validation
+scores = cross_val_score(multi_model, X_train, y_train, scoring= "neg_mean_squared_error", cv=cv)
+
+# Fit the model
+multi_model.fit(X_train, y_train)
 
 # Report results
-# print("Cross-validation MAE scores (negated):", -scores)
-# print("Mean MAE:", -np.mean(scores))
-# print("Standard deviation:", np.std(scores))
+print("Cross-validation MSE scores (negated):", -scores, np.std(scores))
 
-# multi_model.fit(X_train, y_train)
+predictions = multi_model.predict(X_test)
+sbp_pred = predictions[:, 0]
+dbp_pred = predictions[:, 1]
+map_pred = predictions[:, 2]
 
-# predictions = multi_model.predict(X_test)
-# sbp_pred = predictions[:, 0]
-# dbp_pred = predictions[:, 1]
-# map_pred = predictions[:, 2]
+evaluate(y_test[:, 0], sbp_pred, "SBP")
+evaluate(y_test[:, 1], dbp_pred, "DBP")
+evaluate(y_test[:, 2], map_pred, "MAP")
 
-# evaluate(y_test[:, 0], sbp_pred, "SBP")
-# evaluate(y_test[:, 1], dbp_pred, "DBP")
-# evaluate(y_test[:, 2], map_pred, "MAP")
+predictions_vald = multi_model.predict(X_train)
+sbp_pred = predictions_vald[:, 0]
+dbp_pred = predictions_vald[:, 1]
+map_pred = predictions_vald[:, 2]
+
+evaluate(y_train[:, 0], sbp_pred, "SBP")
+evaluate(y_train[:, 1], dbp_pred, "DBP")
+evaluate(y_train[:, 2], map_pred, "MAP")
 
 # SHAPvalues(target_label,multi_model)
 
@@ -162,19 +171,6 @@ print("Best MAE:", -grid_search.best_score_)
 #     plt.grid(True)
 #     plt.show()
 
-# param_grid = {
-#     'estimator__num_leaves': [31, 50],
-#     'estimator__learning_rate': [0.01, 0.05],
-#     'estimator__n_estimators': [100, 200]
-# }
-# grid = GridSearchCV(
-#     MultiOutputRegressor(LGBMRegressor(random_state=42)),
-#     param_grid,
-#     cv=3,
-#     scoring='neg_mean_absolute_error',
-#     verbose=1,
-#     n_jobs=-1
-# )
 
 
 
