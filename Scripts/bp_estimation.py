@@ -9,22 +9,34 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
-
-data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
-data_path_target = 'BP_values.h5'
-data = {}
-data_target = {}
-segment_ids = {}
+from other_functions import bland_altman_plot
 
 def evaluate(true, pred, label):
     me = np.mean(true - pred)
+    stdme = np.std(true - pred)
     mae = mean_absolute_error(true, pred)
+    stdmae = np.std(abs(true - pred))
     mse = mean_squared_error(true, pred)
+    stdmse = np.std((true - pred)**2)
     rmse = np.sqrt(mean_squared_error(true, pred))
     r,_ = pearsonr(true, pred)
     abs_error = abs(true - pred)
+    df = pd.DataFrame([me,stdme,mae,stdmae,mse,stdmse,rmse,r],index=["ME","stdME","MAE","stdMAE","MSE","stdMSE","RMSE","R Pearson"])
+
+    # bland_altman_plot(true, pred, label)
+    print(f"{label} \nME: {me:.2f} ± {stdme} \nMAE: {mae:.2f} ± {stdmae} \nMSE: {mse:.3f} ± {stdmse} \nRMSE: {rmse:.2f} \nPearson: {r:.2f}")
+
+    return df
+
+def results(predict, real, targets):
+    df_pred_error = pd.DataFrame(columns=targets, index=["ME","stdME","MAE","stdMAE","MSE","stdMSE","RMSE","R Pearson"])
+    for t in np.arange(len(targets)):
+        pred = predict[:, t]
+        d = evaluate(real[:, t], pred, targets[t])
+        df_pred_error[targets[t]] = d
     
-    print(f"{label} \nPearson: {r:.2f}\nMAE: {mae:.2f} \nME: {me:.2f} \nRMSE: {rmse:.2f} \nMSE: {mse:.3f}")
+    return df_pred_error
+
 
 def SHAPvalues(target_labels: list, model):
     multi_model = model
@@ -33,9 +45,43 @@ def SHAPvalues(target_labels: list, model):
         model_i = multi_model.estimators_[i]
         # Use TreeExplainer (fast & efficient for LightGBM)
         explainer = shap.Explainer(model_i)
-        shap_values = explainer(dataframe_X[:10000])
+        shap_values = explainer(dataframe_X[:1000])
         # Summary plot
-        shap.summary_plot(shap_values, dataframe_X[:10000], feature_names=dataframe_X.columns)
+        shap.summary_plot(shap_values, dataframe_X[:1000], feature_names=dataframe_X.columns, show = False)
+        plt.title(f"SHAP Plot for {target_labels[i]}", fontsize=14)
+        plt.savefig(f"{target_labels[i]}_shap_summary_plot.png", dpi=300, bbox_inches='tight')
+        plt.close()
+
+def grid_searchCV(model, param_grid, n_splits, X_train, y_train, score):
+    # Grid Search (tuning fot the best hyperparameters for LGBM model)
+    # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__.
+    cv = KFold(n_splits= n_splits, shuffle=True, random_state=42)
+    grid_search = GridSearchCV(
+        estimator= model,
+        param_grid= param_grid,
+        scoring= score,  # or 'r2', 'neg_mean_squared_error'
+        cv= cv,
+        n_jobs=-1,
+        verbose=1
+    )
+    grid_search.fit(X_train, y_train, groups=groups[train_idx])
+
+    best_idx = grid_search.best_index_
+    std = grid_search.cv_results_['std_test_score'][best_idx]
+    print("Best parameters:", grid_search.best_params_)
+    print(f"Best {score}:", -grid_search.best_score_,"+",std)
+    best_param = grid_search.best_params_
+    best_model = grid_search.best_estimator_
+
+    return best_model, best_param, grid_search 
+
+
+
+data_path = 'C:/Users/adhn565/Documents/Data/data_clean_features.h5'
+data_path_target = 'BP_values.h5'
+data = {}
+data_target = {}
+segment_ids = {}
 
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -87,90 +133,51 @@ gss = GroupShuffleSplit(n_splits=1, train_size=0.8, test_size=0.2, random_state=
 train_idx, test_idx = next(gss.split(dataframe_X, df_target, groups=groups))
 X_train, X_test = dataframe_X.iloc[train_idx], dataframe_X.iloc[test_idx]
 y_train, y_test = df_target.iloc[train_idx], df_target.iloc[test_idx]
+a, X_valid, b, y_valid = train_test_split(X_train,y_train,test_size=0.2, random_state=42)
 
 # Impute the data since I have a couple of nan values, doing it after the splitting to avoid data leakage
 imputer_X = SimpleImputer(strategy='median')
 X_train = imputer_X.fit_transform(X_train)
 X_test = imputer_X.transform(X_test)
+X_valid = imputer_X.fit_transform(X_valid)
 
 imputer_y = SimpleImputer(strategy='median')
 y_train = imputer_y.fit_transform(y_train)
 y_test = imputer_y.transform(y_test) 
+y_valid = imputer_y.fit_transform(y_valid)
 
 # Model for multiple targets
-model = lgb.LGBMRegressor(random_state= 42, num_leaves= 50, learning_rate= 0.05, max_depth= 15, n_estimators=1000)
+model = lgb.LGBMRegressor(random_state= 42, num_leaves= 50, learning_rate= 0.05, max_depth= -1, n_estimators= 800)
 multi_model = MultiOutputRegressor(model)
 
-cv = KFold(n_splits=5, shuffle=True, random_state=42)
+param_grid = {
+        'estimator__learning_rate': [0.05, 0.1],
+        'estimator__n_estimators': [400, 800],
+        # 'estimator__max_depth': [-1, 15],
+        # 'estimator__num_leaves': [50]
+    }
 
-# Grid Search (tuning fot the best hyperparameters for my LGBM model)
-# # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__.
-# param_grid = {
-#     'estimator__learning_rate': [0.05, 0.1],
-#     'estimator__n_estimators': [500, 1000],
-#     'estimator__max_depth': [10, 15],
-#     'estimator__num_leaves': [31, 50]
-# }
-
-# grid_search = GridSearchCV(
-#     estimator=multi_model,
-#     param_grid=param_grid,
-#     scoring= "neg_mean_squared_error",  # or 'r2', 'neg_mean_squared_error'
-#     cv=cv,
-#     n_jobs=-1,
-#     verbose=1
-# )
-
-# grid_search.fit(X_train, y_train, groups=groups[train_idx])
-
-# best_idx = grid_search.best_index_
-# std = grid_search.cv_results_['std_test_score'][best_idx]
-# print("Best parameters:", grid_search.best_params_)
-# print("Best MSE:", -grid_search.best_score_,"+",std)
-
-# best_model = grid_search.best_estimator_
+# multi_model, best_parameters, grid_search = grid_searchCV(multi_model, param_grid, 5, X_train, y_train, "neg_mean_squared_error")
 
 # Run cross-validation
-scores = cross_val_score(multi_model, X_train, y_train, scoring= "neg_mean_squared_error", cv=cv)
+cv = KFold(n_splits=5, shuffle=True, random_state=42)
+score = "neg_mean_absolute_error"
+scores = cross_val_score(multi_model, X_train, y_train, scoring= score, cv=cv)
+print(f"Cross-validation {score} scores (negated):", -scores, np.std(scores))
 
 # Fit the model
 multi_model.fit(X_train, y_train)
+# Testing
+predictions = multi_model.predict(X_test)
+# Validation
+predictions_valid = multi_model.predict(X_valid)
 
 # Report results
-print("Cross-validation MSE scores (negated):", -scores, np.std(scores))
+# Testing
+df_pred_error = results(predictions, y_test, target_label)
 
-predictions = multi_model.predict(X_test)
-sbp_pred = predictions[:, 0]
-dbp_pred = predictions[:, 1]
-map_pred = predictions[:, 2]
+# Validation
+df_valid_error = results(predictions_valid, y_valid, target_label)
 
-evaluate(y_test[:, 0], sbp_pred, "SBP")
-evaluate(y_test[:, 1], dbp_pred, "DBP")
-evaluate(y_test[:, 2], map_pred, "MAP")
-
-predictions_vald = multi_model.predict(X_train)
-sbp_pred = predictions_vald[:, 0]
-dbp_pred = predictions_vald[:, 1]
-map_pred = predictions_vald[:, 2]
-
-evaluate(y_train[:, 0], sbp_pred, "SBP")
-evaluate(y_train[:, 1], dbp_pred, "DBP")
-evaluate(y_train[:, 2], map_pred, "MAP")
-
+print(df_pred_error, df_valid_error)
 # SHAPvalues(target_label,multi_model)
-
-# for i in range(len(target_label)):
-#     plt.figure()
-#     plt.scatter(y_test[:, i], predictions[:, i], alpha=0.5)
-#     plt.plot([y_test[:, i].min(), y_test[:, i].max()],
-#              [y_test[:, i].min(), y_test[:, i].max()],
-#              'r--')
-#     plt.xlabel("True")
-#     plt.ylabel("Predicted")
-#     plt.title(f"{target_label[i]}: Predicted vs True")
-#     plt.grid(True)
-#     plt.show()
-
-
-
-
