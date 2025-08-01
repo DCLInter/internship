@@ -363,8 +363,16 @@ with h5py.File(data_path_clean, 'r') as f:
         for dtset_name in group:
             data_clean[group_name][dtset_name] = group[dtset_name][()]
 
-c = Comparator(data,data_clean,features,"")
-c.extractResults()
+# c = Comparator(data,data_clean,features,"")
+# c.extractResults()
+total = []
+for p,d in data.items():
+    size = d[f"mean_{p}"][0].size
+    total.append(size//2)
+    if size == 0:
+        print(p)
+total = np.sum(total)
+print(total)
 # st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
 # st_ch_med, outl_med, outl_ch_med = byFeature_medians(data,data_clean,features)
 # st_ch_all, outl_all, overlap, outl_ch_all = byFeature_all(data,data_clean,features)

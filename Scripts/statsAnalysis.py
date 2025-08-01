@@ -13,7 +13,7 @@ from sklearn.ensemble import IsolationForest
 data = {}
 segment_ids = {}
 listaFinal = []
-data_path = 'C:/Users/adhn565/Documents/Data/data_clean_features.h5'
+data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
 
 if data_path=="":
     data_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
@@ -34,7 +34,7 @@ with h5py.File(data_path, 'r') as f:
     fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 
-data = {k: data[k] for k in ["p000001","p000003","p000005"] if k in data}
+# data = {k: data[k] for k in ["p000001","p000003","p000005"] if k in data}
 # data = {k: data[k] for k in list(data.keys())[:50] if k in data}
 # Now, data['p000001']['segment_0'] gives you the numpy array for that dataset
 # And, data['p000001']['mean_p000005'][0] gives you the numpy array for the first row of the dataset
@@ -287,7 +287,7 @@ def analysis_feat(patient:str ,feature: int, dataset: str, stats_data: pd.DataFr
     return stats_data,outliers_data
 
 
-savefolder = "c:/Users/adhn565/Documents/Stats_clean"
+savefolder = "c:/Users/adhn565/Documents/Stats"
 normal_feats = {}
 for p in data.keys():
     save_folder = os.path.join(savefolder,p)
@@ -308,13 +308,13 @@ for p in data.keys():
 
         QQplot_all(p,save_QQ, dataset=d)
         Hist_all(p,save_hist,dataset=d)
-        for f in range(0,len(features)):
-            st_data,ot_data = analysis_feat(patient=p,feature=f,dataset="median",stats_data=full_data,outliers_data=out_all)
-        st_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
-        ot_data.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
-        normal_feats[p][d.replace("_"+p,"")].append(nf)
-    df_nf = pd.DataFrame(normal_feats)
-    df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
+    #     for f in range(0,len(features)):
+    #         st_data,ot_data = analysis_feat(patient=p,feature=f,dataset=d,stats_data=full_data,outliers_data=out_all)
+    #     st_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
+    #     ot_data.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
+    #     normal_feats[p][d.replace("_"+p,"")].append(nf)
+    # df_nf = pd.DataFrame(normal_feats)
+    # df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
 
 def plot_overPatients():
     for d in ["mean","median"]:
@@ -322,7 +322,7 @@ def plot_overPatients():
         boxMedians(savefolder=savefolder,dataset=d)
 
 plot_overPatients()
-isolationForest()
+isolationForest(data)
 # hisMedians()
 # x = search_feat("PRV")
 # analysis_feat("p000001",x)
