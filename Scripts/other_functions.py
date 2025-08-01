@@ -15,18 +15,18 @@ def search_feat(feature:str, features_list: list):
             x = features_list.index(i)
     return x
 def bland_altman_plot(true, pred, label):
-    mean = (true + pred) / 2
-    diff = pred - true
+    mean = (true + pred) / 2                # X
+    diff = pred - true                      # Y
     mean_diff = np.mean(diff)
     std_diff = np.std(diff)
 
     plt.figure(figsize=(6, 4))
     plt.scatter(mean, diff, alpha=0.5)
-    plt.axhline(mean_diff, color='red', linestyle='--', label=f"Mean Diff: {mean_diff:.2f}")
-    plt.axhline(mean_diff + 1.96 * std_diff, color='gray', linestyle='--', label='+1.96 SD')
-    plt.axhline(mean_diff - 1.96 * std_diff, color='gray', linestyle='--', label='-1.96 SD')
+    plt.axhline(mean_diff, color='red', linestyle='--', label=f"Mean: {mean_diff:.2f}")
+    plt.axhline(mean_diff + 1.96 * std_diff, color='gray', linestyle='--', label='+ 1.96*SD')
+    plt.axhline(mean_diff - 1.96 * std_diff, color='gray', linestyle='--', label='- 1.96*SD')
     plt.title(f"Bland-Altman Plot: {label}")
-    plt.xlabel('Mean of True and Predicted')
+    plt.xlabel('Mean (Pred - True)')
     plt.ylabel('Difference (Pred - True)')
     plt.legend()
     plt.tight_layout()

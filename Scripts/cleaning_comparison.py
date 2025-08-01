@@ -20,11 +20,10 @@ class Comparator:
         percentile25 = quantiles[0]
         percentile75 = quantiles[1]
         mad = scStats.median_abs_deviation(array, nan_policy="omit")
-
         high_limit = percentile75 + iqr*1.5
         low_limit = percentile25 - iqr*1.5
-        score_mad = abs((array - median)/mad)
-
+        score_mad = abs((array - median)/mad) if mad != 0 else np.full_like(array,0)
+        
         outliers_iqr = array[(array < low_limit) | (array > high_limit)]
         outliers_mad = array[score_mad > 3]
         
@@ -55,8 +54,8 @@ class Comparator:
         percentiles25 = [quantiles_before[0], quantiles_after[0]]
         percentiles75 = [quantiles_before[1], quantiles_after[1]]
         
-        means_change = 100*np.diff(means)[0]/means[0] if means[0] != 0 else 0
-        median_change = 100*np.diff(median)[0]/median[0] if median[0] != 0 else 0
+        means_change = 100*np.diff(means)[0]/means[0] if means[0] != 0 else np.nan
+        median_change = 100*np.diff(median)[0]/median[0] if median[0] != 0 else np.nan
         percentiles_change = [ 100*np.diff(percentiles25)[0]/percentiles25[0] , 100*np.diff(percentiles75)[0]/percentiles75[0] ]
 
         iqr = [scStats.iqr(x, nan_policy="omit"), scStats.iqr(y, nan_policy="omit")]
@@ -109,15 +108,14 @@ class Comparator:
                     x_before = x_before[:len(x_before)//2]
                 x_after = ft_clean[feat]
                 
-                try:
-                    stat_changes = self.cleaningAnalysis(before = x_before, after = x_after)
-                    change_perFeature[ft_names[feat]] = stat_changes
+                if x_before.size == 0 or x_after.size == 0: 
+                    continue
 
-                    outliers_original = self.outliers_IQRandMAD(x_before)
-                    outliers_clean = self.outliers_IQRandMAD(x_after)
-
-                except:
-                    print(f"{patient}, {features[feat]}\nOne of the arrays its empty: \n normal data (size): {x_before.size}\n clean data (size): {x_after.size}")
+                stat_changes = self.cleaningAnalysis(before = x_before, after = x_after)
+                change_perFeature[ft_names[feat]] = stat_changes
+            
+                outliers_original = self.outliers_IQRandMAD(x_before)
+                outliers_clean = self.outliers_IQRandMAD(x_after)
 
                 outliers_perFeature[ft_names[feat]] = {
                 "outliers_original": outliers_original,
@@ -150,6 +148,9 @@ class Comparator:
         return change_perPatient, outliers_perPatient, change_outliers
 
     def byFeature_medians(self):
+        # Note that if your data has only 1 value this analysis makes no sense since the statistics will be either the same value or 0
+        # In this case if the patients has only 1 signal leading to a unique value for their features this analysis wont give important information
+        # After all the point its to compare how the distribution of feature for a patient changes
         data = self.data
         data_clean = self.data_clean
         ft_names = self.feat_names
@@ -216,8 +217,6 @@ class Comparator:
 
             outl_changes.loc[ft,"IQR_change"] = iqr_change
             outl_changes.loc[ft,"MAD_change"] = mad_change
-
-            print("antes",array_before.size,"despues",array_after.size)
         
         return median_all, outliers, outl_changes
 
@@ -298,11 +297,10 @@ class Comparator:
                 "overlap_mad": 100*overlap_mad_score
             }
 
-            print("antes",array_before.size,"despues",array_after.size)
-
         return signals_all, outliers, overlaps, outl_changes
     
     def extractResults(self):
+        print("Saving results by feature: ")
         filepath = self.filepath
         st_ch_med, outl_med, outl_ch_med = self.byFeature_medians()
         st_ch_all, outl_all, overlap, outl_ch_all = self.byFeature_all()
@@ -335,6 +333,51 @@ class Comparator:
         for name, df in dataframes.items():
             filename = os.path.join(filepath, f"{name}.xlsx")
             to_xslx(df, filename)
+    def extractResults_byPatient(self):
+        print("Saving results for each patient: ")
+        data = self.data
+        features = self.feat_names
+        st_ch_p, outl_p, outl_ch = self.byPatient()
+
+        # Saving outliers change
+        df_iqr_p = pd.DataFrame(columns=features, index= data.keys())
+        df_mad_p = pd.DataFrame(columns=features, index= data.keys())
+
+        for p, df in outl_ch.items():
+            v = df["IQR_change"].values
+            if v.size == 0:
+                v = np.full_like(features,np.nan)
+            df_iqr_p.loc[p] = v
+
+            v = df["MAD_change"].values
+            if v.size == 0:
+                v = np.full_like(features,np.nan)
+            df_mad_p.loc[p] = v
+
+        with pd.ExcelWriter("outliers_change_byPatient.xlsx") as writer:
+            df_iqr_p.to_excel(writer, sheet_name= "IQR_change", index=True)
+            df_mad_p.to_excel(writer, sheet_name= "MAD_change", index=True)
+            print("Data saved to Outliers_change_byPatient.xlsx")
+
+        # Saving statistics
+        stats = ["mean","median","Q3","Q1","IQR","MAD","KS test","KS p-value","Wasserstein_dist"]
+        stat_per_feature = {}
+        for f in features:
+            df = pd.DataFrame(columns= stats)
+            for p, d in st_ch_p.items():
+                if not d:
+                    continue
+
+                st_dict = d[f]
+                st_df = pd.DataFrame(st_dict, index=[p])
+                df = pd.concat([df,st_df], axis=0)
+            stat_per_feature[f] = df
+        with pd.ExcelWriter("stats_change_byPatient.xlsx") as writer:
+            for f in features:
+                df = stat_per_feature[f]
+                df.to_excel(writer, sheet_name= f, index=True)
+            print("Data saved to stats_change_byPatient.xlsx")
+
 
 
 data = {}
@@ -363,39 +406,22 @@ with h5py.File(data_path_clean, 'r') as f:
         for dtset_name in group:
             data_clean[group_name][dtset_name] = group[dtset_name][()]
 
-# c = Comparator(data,data_clean,features,"")
-# c.extractResults()
-total = []
-for p,d in data.items():
-    size = d[f"mean_{p}"][0].size
-    total.append(size//2)
-    if size == 0:
-        print(p)
-total = np.sum(total)
-print(total)
-# st_ch_p, outl_p, outl_ch = byPatient(data,data_clean,features)
+c = Comparator(data,data_clean,features,"")
+c.extractResults()
+c.extractResults_byPatient()
+# total = []
+# for p,d in data.items():
+#     size = d[f"mean_{p}"][0].size
+#     total.append(size//2)
+#     if size == 0:
+#         print(p)
+# total = np.sum(total)
+# print(total)
+
 # st_ch_med, outl_med, outl_ch_med = byFeature_medians(data,data_clean,features)
 # st_ch_all, outl_all, overlap, outl_ch_all = byFeature_all(data,data_clean,features)
 
-# df_iqr_p = pd.DataFrame(columns=features)
-# df_mad_p = pd.DataFrame(columns=features)
 
-# for p, df in outl_ch.items():
-#     for ft, otl in df.items():
-#         df_iqr_p.loc[p, ft] = otl["IQR_change"]
-#         df_mad_p.loc[p, ft] = otl["MAD_change"]
-
-#         df_iqr_p.loc[p+"_1", ft] = otl["IQRbef%"]
-#         df_mad_p.loc[p+"_1", ft] = otl["MADbef%"]
-
-#         df_iqr_p.loc[p+"_2", ft] = otl["IQRaft%"]
-#         df_mad_p.loc[p+"_2", ft] = otl["MADaft%"]
-
-# filepath = "C:/Users/adhn565/Documents/Data"
-# for p, df in outl_ch.items():
-#     filename = os.path.join(filepath, f"{p}.xlsx")
-#     to_xslx(df, filename)
-# print(st_ch_med["Av-Au ratio"])
 
 # Create DataFrames for the results
 # df_stats_med = pd.DataFrame(index=st_ch_med.keys())
