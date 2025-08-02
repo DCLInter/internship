@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from other_functions import bland_altman_plot
 
 class BPModel_LightGBM:
-    def __init__(self, data: dict, data_target: dict, target_label: list, limit_data: int = 10000):
+    def __init__(self, data: dict, data_target: dict, target_label: list, default_model: bool, limit_data: int = 10000):
 
         dataframe_X = pd.DataFrame(columns=features)
         for p in data.keys():
@@ -39,6 +39,10 @@ class BPModel_LightGBM:
         self.target = df_target
         self.groups = groups
         self.target_label = target_label
+        self.model_setup(valid_set=True)
+        self.split(valid_set=True)
+        if default_model:
+            self.error_test, self.error_valid = self.prediction(valid_set=True)
 
         # Splitting the data patient wise to avoid data leakage
     def split(self, test_size: int = 0.2, n_split: int = 1, valid_set: bool = False):
@@ -50,28 +54,8 @@ class BPModel_LightGBM:
         train_idx, test_idx = next(gss.split(dataframe_X, df_target, groups=groups))
         X_train, X_test = dataframe_X.iloc[train_idx], dataframe_X.iloc[test_idx]
         y_train, y_test = df_target.iloc[train_idx], df_target.iloc[test_idx]
-
         self.train_idx = train_idx
         self.test_idx = test_idx
-        self.X_train = X_train
-        self.y_train = y_train
-        self.X_test = X_test
-        self.y_test = y_test
-
-        if valid_set:
-            a, X_valid, b, y_valid = train_test_split(X_train,y_train,test_size=0.2, random_state=42)
-            self.X_valid = X_valid
-            self.y_valid = y_valid
-            return X_train, y_train, X_test, y_test, X_valid, y_valid
-
-        return X_train, y_train, X_test, y_test
-    
-    def model_setup(self, parameters: dict = None, valid_set: bool = False):
-        X_train = self.X_train
-        X_test = self.X_test
-        y_train = self.y_train
-        y_test = self.y_test
-
         # Impute the data since I have a couple of nan values, doing it after the splitting to avoid data leakage
         imputer_X = SimpleImputer(strategy='median')
         X_train = imputer_X.fit_transform(X_train)
@@ -81,18 +65,22 @@ class BPModel_LightGBM:
         y_train = imputer_y.fit_transform(y_train)
         y_test = imputer_y.transform(y_test) 
         
-        if valid_set:
-            X_valid = self.X_valid
-            y_valid = self.y_valid
-            X_valid = imputer_X.fit_transform(X_valid)
-            y_valid = imputer_y.fit_transform(y_valid)
-        
         self.X_train = X_train
         self.y_train = y_train
         self.X_test = X_test
         self.y_test = y_test
-        self.X_valid = X_valid
-        self.y_valid = y_valid
+
+        if valid_set:
+            a, X_valid, b, y_valid = train_test_split(X_train,y_train,test_size=0.2, random_state=42)
+            X_valid = imputer_X.fit_transform(X_valid)
+            y_valid = imputer_y.fit_transform(y_valid)
+            self.X_valid = X_valid
+            self.y_valid = y_valid
+            return X_train, y_train, X_test, y_test, X_valid, y_valid
+
+        return X_train, y_train, X_test, y_test
+    
+    def model_setup(self, parameters: dict = None, valid_set: bool = False):
 
         default_params = {
         "random_state": 42,
@@ -112,31 +100,30 @@ class BPModel_LightGBM:
         
         return multi_model
     
-    def prediction_default(self, valid_set: bool = True):
+    def prediction(self, valid_set: bool = False):
 
-        self.split(valid_set=valid_set)
-        multi_model = self.model_setup(valid_set=valid_set)
+        multi_model = self.model
         X_train, y_train, X_test, y_test, X_valid, y_valid = self.X_train, self.y_train, self.X_test, self.y_test, self.X_valid, self.y_valid
 
         # Fit the model
         multi_model.fit(X_train, y_train)
         # Testing
         predictions = multi_model.predict(X_test)
-        # Validation
-        predictions_valid = multi_model.predict(X_valid)
-
-        # Report results
-        # Testing
         df_pred_error = self.results(predictions, y_test, target_label)
-        # Validation
-        df_valid_error = self.results(predictions_valid, y_valid, target_label)
 
         self.SHAPvalues(self.target_label)
+        
+        # Validation
+        if valid_set:
+            predictions_valid = multi_model.predict(X_valid)
+            df_valid_error = self.results(predictions_valid, y_valid, target_label)
+            return df_pred_error, df_valid_error
 
-        return df_pred_error, df_valid_error
+        return df_pred_error
         
     
     def grid_searchCV(self, param_grid, n_splits: int = 5, score: str = "neg_mean_squared_error"):
+
         groups = self.groups
         model = self.model
         X_train = self.X_train
@@ -144,7 +131,7 @@ class BPModel_LightGBM:
         train_idx = self.train_idx
 
         # Grid Search (tuning fot the best hyperparameters for LGBM model)
-        # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__.
+        # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__ in PARAM_GRID.
         cv = KFold(n_splits= n_splits, shuffle=True, random_state=42)
         grid_search = GridSearchCV(
             estimator= model,
@@ -162,6 +149,8 @@ class BPModel_LightGBM:
         print(f"Best {score}:", -grid_search.best_score_,"+",std)
         best_param = grid_search.best_params_
         best_model = grid_search.best_estimator_
+
+        self.model = best_model
 
         return best_model, best_param, grid_search
 
@@ -207,6 +196,7 @@ class BPModel_LightGBM:
             plt.close()
 
 
+
 data_path = 'C:/Users/adhn565/Documents/Data/data_clean_features.h5'
 data_path_target = 'BP_values.h5'
 data = {}
@@ -236,7 +226,17 @@ with h5py.File(data_path_target, 'r') as f:
             data_target[group_name][dtset_name] = group[dtset_name][()]
             data_target[group_name][dtset_name] = data_target[group_name][dtset_name]
 
-bp = BPModel_LightGBM(data,data_target,target_label= target_label)
+# Initialize the BPModel_LightGBM with the data and target
+# Note: The default_model parameter is set to True to use the default model setup and perform initial predictions.
+bp = BPModel_LightGBM(data,data_target,target_label= target_label,default_model=True)
+errors_test, errors_valid = bp.error_test, bp.error_valid
+
+#You can do your own splitting of the data.
+bp.split(test_size=0.2, n_split=1, valid_set=True)
+
+# Example of how to use the grid search for hyperparameter tuning
+# Note: The function grid_searchCV will return the best model, best parameters and the grid search object.
+# The grid_searchCV function will automatically update the model with the best parameters so you can use prediction directly after it.
 param_grid = {
         'estimator__learning_rate': [0.05, 0.1],
         'estimator__n_estimators': [400, 800],
@@ -244,7 +244,19 @@ param_grid = {
         # 'estimator__num_leaves': [50]
     }
 bp.grid_searchCV(param_grid=param_grid,n_splits=2)
-# d1, d2 = bp.prediction()
+errors_test, errors_valid = bp.prediction(valid_set=True)
+
+# Example of how to use the model for own parameters and prediction
+# Note: The parameters should be a dictionary with the same keys as the default parameters.
+parameters = {
+        "random_state": 42,
+        "n_estimators": 800,
+        "learning_rate": 0.05,
+        "max_depth": -1,
+        "num_leaves": 50
+        }
+bp.model_setup(parameters=parameters, valid_set=True)
+errors_test, errors_valid = bp.prediction(valid_set=True)
 
 # dataframe_X = pd.DataFrame(columns=features)
 # for p in data.keys():

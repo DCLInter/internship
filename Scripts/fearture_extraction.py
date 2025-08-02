@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 import pandas as pd
+import scipy.stats
 from dotmap import DotMap
 
 from pyPPG import PPG, Fiducials, Biomarkers
@@ -15,12 +16,10 @@ import pyPPG.biomarkers as BM
 from lib_changes import biomarkers2 as BM2 ##Modified
 
 from tkinter import filedialog
-import scipy.stats
-
-from Scripts.other_functions_PPG import Others ### Class with some other functions
+from other_functions_PPG import Others ### Class with some other functions
 
 class Feature_Extraction():
-    def __init__(self, data_path: str, h5name: str, csvname: str):
+    def __init__(self, data_path: str, h5name: str, csvname: str, data_ext: dict = None):
         
         self.data = {}
         self.segment_ids = {}
@@ -53,9 +52,13 @@ class Feature_Extraction():
                     self.demo_info[group_name] = {}
                 for attr_name, attr_value in group.attrs.items():
                     self.demo_info[group_name][attr_name] = attr_value
-        self.data = {k: self.data[k] for k in ["p000010"] if k in self.data} # This is to change the amount of data you want to analyze
 
-    def  save_h5(self,fiducials: dict,means: dict,medians: dict,fiducials_names: list, filename: str):
+        if data_ext is not None:
+            self.data = data
+
+        #self.data = {k: self.data[k] for k in ["p000010"] if k in self.data} # This is to change the amount of data you want to analyze
+
+    def  save_h5(self, fiducials: dict, means: dict, medians: dict, fiducials_names: list, filename: str):
         demo_info = self.demo_info
         samples = self.samples
         with h5py.File(filename, 'w') as f:
@@ -63,8 +66,9 @@ class Feature_Extraction():
             for patient_id, fiducials_list in fiducials.items():
                 grp = f.create_group(patient_id)
                 # Saves the demographic info in the attributes of each group
-                for attr_name, attr_value in demo_info[patient_id].items():
-                    grp.attrs[attr_name] = attr_value
+                if demo_info is not None:
+                    for attr_name, attr_value in demo_info[patient_id].items():
+                        grp.attrs[attr_name] = attr_value
                 fiducials_list = fiducials_list.replace({pd.NA: np.nan})
                 ### Creates 3 datasets: segments,mean_patient and median_patient
                 ### the attributes of each dataset are their respective columns
@@ -79,7 +83,7 @@ class Feature_Extraction():
                 med = grp.create_dataset(f"median_{patient_id}",data=stats2.to_numpy(dtype = float, na_value = np.nan))
                 med.attrs["features"] = np.array(stats2.index.tolist(), dtype= 'S')
 
-    def stats_features(self,features: pd.DataFrame):
+    def stats_features(self, features: pd.DataFrame):
         X = pd.DataFrame(columns=features.columns)
         Med = pd.DataFrame(columns=features.columns)
         for ft in features.columns:
@@ -212,7 +216,7 @@ class Feature_Extraction():
         print("Saving in: ",self.filename_save)
         self.save_h5(signal_dict,mean,median,fiducials_names=fp_col, filename=self.filename_save)
         
-        # Saving the signals that arent detecting enough peaks
+        # Saving the signals that could not be processed due to empty fiducials
         df_empty = pd.DataFrame({
         'patient': list(empty.keys()),
         'segment_id': [v for v in empty.values()],
@@ -226,7 +230,7 @@ class Feature_Extraction():
 
 #### Feature extraction ####
 
-data_path = 'Data/patient_data.h5'
+data_path = 'patient_data.h5'
 filename_save = "a.h5"
 filename_csv = "a.csv"
 
@@ -235,10 +239,22 @@ if data_path=="":
 else:
     pass
 
+# This will create a Feature_Extraction object with the data path and the names of the files to save
+# The class will read h5 file and extract the features from the signals
+# Be sure that the h5 file has groups as patients and their dataset is the signals
+# and that the first 4 columns of the dataset can be removed (they are not needed for the features)
+# If you want you can input the data directly with the parameter "data", in a dictionary with this format:
+
+# data = {
+#           "patient_id or whatever you want to call it": np.array( [signal1, signal2, ...] )
+#           }
+
 ftext = Feature_Extraction(data_path,filename_save,filename_csv)
+
 ######### You can access to the signals with: #########
-# ftext.data["name of the group in .h5 file"]
+# signals = ftext.data["name of the group in .h5 file"]
 
 # Proceed with the feature extraction, it will generate a .h5file
 # The first column of the segments dataset will contain the signal_id
-ftext.feature_extraction()
+# it will save the mean and median of the features for each signal in the segments dataset
+features_means, features_medians, failed, fiducial_points = ftext.feature_extraction()

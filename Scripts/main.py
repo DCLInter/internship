@@ -27,6 +27,7 @@ def main():
     ### Cleaning  the original dataset based on the report of the Checker
     c = Cleaner(filename_report)
     dictFlags = c.detect()
+    # You can clean the data contaning the features or the original data with just the signals
     clean_data = c.clean(path_fiducials)
     c.csvReport(filename_csvReport)
     c.saveh5(filename_cleanData)
