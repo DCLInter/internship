@@ -1,7 +1,11 @@
+
 from checker import Checker
 from cleaning import Cleaner
 
+
 def main():
+    #### Checking and generating report the fiducial points ####
+    
     path_fiducials = "C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5"
     path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
     filename_report = "C:/Users/adhn565/Documents/Data/mtrics_28_7_2025.h5"
@@ -28,7 +32,7 @@ def main():
     c = Cleaner(filename_report)
     dictFlags = c.detect()
     # You can clean the data contaning the features or the original data with just the signals
-    clean_data = c.clean(path_fiducials)
+    clean_data = c.clean(path_fiducials) # path_originalData
     c.csvReport(filename_csvReport)
     c.saveh5(filename_cleanData)
 

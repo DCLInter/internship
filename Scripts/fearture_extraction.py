@@ -15,7 +15,6 @@ from lib_changes import fiducials2 as FP2 ##Modified
 import pyPPG.biomarkers as BM
 from lib_changes import biomarkers2 as BM2 ##Modified
 
-from tkinter import filedialog
 from other_functions_PPG import Others ### Class with some other functions
 
 class Feature_Extraction():
@@ -54,7 +53,8 @@ class Feature_Extraction():
                     self.demo_info[group_name][attr_name] = attr_value
 
         if data_ext is not None:
-            self.data = data
+            self.data = data_ext
+            self.demo_info = {}
 
         #self.data = {k: self.data[k] for k in ["p000010"] if k in self.data} # This is to change the amount of data you want to analyze
 
@@ -227,34 +227,3 @@ class Feature_Extraction():
         df_empty.to_csv(self.filename_csv,index=False)
 
         return mean,median,df_empty,signal_dict
-
-#### Feature extraction ####
-
-data_path = 'patient_data.h5'
-filename_save = "a.h5"
-filename_csv = "a.csv"
-
-if data_path=="":
-    data_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
-else:
-    pass
-
-# This will create a Feature_Extraction object with the data path and the names of the files to save
-# The class will read h5 file and extract the features from the signals
-# Be sure that the h5 file has groups as patients and their dataset is the signals
-# and that the first 4 columns of the dataset can be removed (they are not needed for the features)
-# If you want you can input the data directly with the parameter "data", in a dictionary with this format:
-
-# data = {
-#           "patient_id or whatever you want to call it": np.array( [signal1, signal2, ...] )
-#           }
-
-ftext = Feature_Extraction(data_path,filename_save,filename_csv)
-
-######### You can access to the signals with: #########
-# signals = ftext.data["name of the group in .h5 file"]
-
-# Proceed with the feature extraction, it will generate a .h5file
-# The first column of the segments dataset will contain the signal_id
-# it will save the mean and median of the features for each signal in the segments dataset
-features_means, features_medians, failed, fiducial_points = ftext.feature_extraction()

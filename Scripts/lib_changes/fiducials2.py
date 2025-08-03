@@ -155,20 +155,19 @@ class FpCollection:
             return peaks, onsets
 
         # detect peaks in windows
+        # the comments with *** are the code for the original script, if you want to use them change the line with it
         all_p4 = []
-        all_hr = np.empty(len(win_starts)) #len -1
-        # print("Number of windows:", len(win_starts),len(all_hr))
+        all_hr = np.empty(len(win_starts)) #len -1 ***
         all_hr [:] = np.NaN
         hr_past = 0 # the actual heart rate
         hrvi = 0    # heart rate variability index
 
-        for win_no in range(0,len(win_starts)): #len -1
-            # curr_els = range(win_starts[win_no],win_starts[win_no] + w)
-            # curr_x = x[curr_els]
-            # print("Window number:", win_no)
+        for win_no in range(0,len(win_starts)): #len -1 ***
+            # curr_els = range(win_starts[win_no],win_starts[win_no] + w) ***
+            # curr_x = x[curr_els] ***
             start = win_starts[win_no]
             end = min(start + w, len(x))
-            curr_x = x[start:end]
+            curr_x = x[start:end] # ***
 
             y1 = self.def_bandpass(curr_x, fs, 0.9 * up.fl_hz, 3 * up.fh_hz)   # Filter no.1
             hr = self.estimate_HR(y1, fs, up, hr_past)               # Estimate HR from weakly filtered signal
@@ -210,13 +209,11 @@ class FpCollection:
         
         all_p4=all_p4.astype(int)
         all_p4 = np.unique(all_p4)
-        # print("Number of detected peaks in all windows:", len(all_p4))
+        
         peaks, fn = self.correct_IBI(all_p4, px, np.median(all_hr), fs, up)
-
         peaks = (all_p4/fs*fso).astype(int)
-        # print("Number of detected peaks:", len(peaks))
         onsets, peaks = self.find_onsets(self.ppg, fso, up, peaks,60/np.median(all_hr)*fs)
-        # print("Number of detected onsets:", len(onsets),"New peaks:", len(peaks))
+        
         # Correct Peaks
         for i in range(0, len(peaks) - 1):
             max_loc = np.argmax(self.ppg[onsets[i]:onsets[i + 1]]) + onsets[i]
