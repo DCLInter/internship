@@ -39,7 +39,7 @@ class Cleaner:
         self.clean_data = {}
         self.demo_info = {}
         self.attributes = {}
-
+        data = {}
         with h5py.File(original_datapath, 'r') as f:
             for group_name in f:
                 group = f[group_name]
@@ -47,11 +47,13 @@ class Cleaner:
                 original_ids[group_name] = group[dataset_names[0]][1]
                 original_ids[group_name] = original_ids[group_name][:len(original_ids[group_name])//2]
                 self.original_data[group_name] = {}
+                data[group_name] = {}
                 self.attributes[group_name] = {}
                 for dst_name in group:
                     self.original_data[group_name][dst_name] = group[dst_name][:].T
                     self.original_data[group_name][dst_name] = self.original_data[group_name][dst_name][:len(self.original_data[group_name][dst_name])//2]
                     self.original_data[group_name][dst_name] = pd.DataFrame(self.original_data[group_name][dst_name],index=original_ids[group_name])
+                    data[group_name][dst_name] = self.original_data[group_name][dst_name]
                     attribute = {}
                     for attr_name, value in f[group_name][dst_name].attrs.items():
                         vdecode = [v.decode() if isinstance(v, bytes) else v for v in value]
@@ -64,8 +66,9 @@ class Cleaner:
                     self.demo_info[group_name][attr_name] = attr_value
 
         remove = self.remove
-        clean_data = self.original_data.copy()
-
+        clean_data = data
+        df = pd.DataFrame()
+        df.drop()
         for patient in remove.keys():
             print(patient)
             sig_rem = np.array(remove[patient])

@@ -17,7 +17,8 @@ class Checker:
             for group_name in f:
                 group = f[group_name]
                 self.data[group_name] = {}
-                self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
+                if "N-samples" in group["segments"].attrs:
+                    self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
                 self.ids[group_name] = list(group["segments"][0])
                 self.ids[group_name] = self.ids[group_name][:len(self.ids[group_name])//2]
                 for dtset_name in group:
@@ -32,8 +33,8 @@ class Checker:
             ### The name and amount of fiducial points and features are the same for all patients
             fiducial = f[group_name]["segments"].attrs['fiducial_order']
             features = f[group_name][f"mean_{group_name}"].attrs['features']
-            self.fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
-            self.features = [f.decode() if isinstance(f, bytes) else f for f in features]
+            self.fiducial_order = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
+            self.features_names = [f.decode() if isinstance(f, bytes) else f for f in features]
 
     def windows(self, patient: str, signal = None, all: bool = False):
         
@@ -69,7 +70,6 @@ class Checker:
         num_noDetect = {}
 
         for patient in self.data.keys():
-        # for patient in ["p000022"]:
 
             ### Storage per patient
             print(patient)
@@ -172,7 +172,7 @@ class Checker:
                             "numberNAvalues": num_noDetect, ### percentage of NA values for each signal
                             "checkOrderFiducials": wrongOrdFidu, ### signals with at least 1 fiducial overlapped or NA value
                             "numberOverlapFiducials": number_overlapFiducial, ### signals with at least 1 overlapped fiducial
-                            "numberOverlapWindows": number_overlapWindows,
+                            "numberOverlapWindows": number_overlapWindows, ### number of windows of the signal that has any fiducial point overlapped
                             "flagForScore": flagScores, ### signals that didnt meet the threshold for the score
                             "combinedScore": scores, ### scores divided by each fiducial points per signal
                             "numberProperFiducials":number_fiducialsDetect, ### percentage of fiducials properly detected
@@ -188,7 +188,6 @@ class Checker:
         remove = ["numberOverlapWindows","checkOrderFiducials","numberOverlapFiducials","flagForScore","checkNAvalues"]
         results = {k: v for k, v in self.resultsMetrics.items() if k not in remove}
         all_patients = list(ids.keys())
-        # all_patients = ["p000022"]
 
         for p in all_patients:
             signal_flags = []

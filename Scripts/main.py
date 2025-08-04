@@ -1,16 +1,29 @@
+import numpy as np
+import pandas as pd
+import h5py
 
+from fearture_extraction import Feature_Extraction
 from checker import Checker
 from cleaning import Cleaner
 
+''' The feature extraction and statistical analysis process its the most time consuming 
+    if you have a large dataset of signals know that its going to take a lot of time '''
 
 def main():
+    #### Feature Extraction ####
+    data_path = "patient_data.h5"
+    filename_save = "extracted_features.h5"
+    filename_csv = "null_detection.csv"
+
+    ftext = Feature_Extraction(data_path,filename_save,filename_csv)
+
     #### Checking and generating report the fiducial points ####
-    
-    path_fiducials = "C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5"
-    path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
-    filename_report = "C:/Users/adhn565/Documents/Data/mtrics_28_7_2025.h5"
-    filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_29_7_2025.h5"
-    filename_csvReport = "C:/Users/adhn565/Documents/Data/report_28_7_2025.csv"
+    path_fiducials = "extracted_features.h5"
+    path_originalData = "patient_data.h5"
+    filename_report = "metrics.h5"
+    filename_cleanData = "clean_data.h5"
+    filename_csvReport = "report.csv"
+
     thresholds = {
                 "sp_limit":2,
                 "bmin":50,

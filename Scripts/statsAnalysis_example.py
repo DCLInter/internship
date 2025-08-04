@@ -7,7 +7,6 @@ from tkinter import filedialog
 
 data = {}
 segment_ids = {}
-listaFinal = []
 data_path = ''
 
 if data_path=="":
