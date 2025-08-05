@@ -7,7 +7,7 @@ from tkinter import filedialog
 
 data = {}
 segment_ids = {}
-data_path = ''
+data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
 
 if data_path=="":
     data_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
@@ -38,16 +38,17 @@ with h5py.File(data_path, 'r') as f:
 # If you want to change the datasets to analyze, you can change the code in the class
 # Please enssure that the data is in the correct format and structure
 
-savefolder = "/Stats"
+savefolder = "C:/Users/adhn565/Documents/Stats"
 stats = STATS(data=data, features=features, savefolder=savefolder, segment_ids=segment_ids)
 
-# Perform the analysis on features and save the results
-# If you want to use the function directly you can do it like this:
+##### Perform the analysis on features and save the results #####
+##### If you want to use the function directly you can do it like this: #####
+
 # you need to pass the data to analize, it can be a list, and array or dataframe (1D)
-data_analysis = []
-stats_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
-outliers_data = pd.DataFrame(index=["IQR","MAD"])
-# If you want to save the boxplots you can specify the folder
-saveBP = os.path.join(savefolder, "BoxPlots")
-os.makedirs(saveBP, exist_ok=True)
-stats, outliers = stats.analysis_feat(data_analysis=data_analysis, stats_data=stats_data, outliers_data=outliers_data, save_BP=saveBP)
+# data_analysis = []
+# stats_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
+# outliers_data = pd.DataFrame(index=["IQR","MAD"])
+# # If you want to save the boxplots you can specify the folder
+# saveBP = os.path.join(savefolder, "BoxPlots")
+# os.makedirs(saveBP, exist_ok=True)
+# stats, outliers = stats.analysis_feat(data_analysis=data_analysis, stats_data=stats_data, outliers_data=outliers_data, save_BP=saveBP)

@@ -1,12 +1,9 @@
-import h5py
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import math
 import scipy.stats as sc
-import tkinter as tk
-from tkinter import filedialog
 import os
 from sklearn.ensemble import IsolationForest
 from other_functions import search_feat
@@ -56,7 +53,7 @@ class STATS:
             df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
 
         self.plot_overPatients(savefolder=savefolder)
-        self.isolationForest(data)
+        self.isolationForest()
 
     def QQplot_all(self, patient: str, save_folder: str, dataset: str):
         data = self.data
@@ -131,7 +128,7 @@ class STATS:
             df_feat = []
             image = os.path.join(savefolder,f"Histogram of {f}.png")
             for p in data.keys():
-                idxf = search_feat(f)
+                idxf = search_feat(f,features)
                 x = data[p][f"{dataset}_{p}"][idxf]
                 x = np.median(x)
                 df_feat.append(x)
@@ -154,7 +151,7 @@ class STATS:
             df_feat = []
             image = os.path.join(savefolder,f"Boxplot of {f}.png")
             for p in data.keys():
-                idxf = search_feat(f)
+                idxf = search_feat(f,features)
                 x = data[p][f"{dataset}_{p}"][idxf]
                 x = np.median(x)
                 df_feat.append(x)
@@ -174,13 +171,13 @@ class STATS:
             self.boxMedians(savefolder=savefolder,dataset=d)
 
     def isolationForest(self):
+        print("Isolation Forest outliers detection:")
         data = self.data
         features = self.features
         savefolder = self.savefolder
         # For isolation forest its a really good tool for identifying outliers wit multiple variables (in this case we are inputing all the features)
-        ot_isf = pd.DataFrame(index=data.keys())
+        ot_isf = pd.DataFrame(index=data.keys(), columns=["outliers%"])
         for patient in data.keys():
-            print(patient)
             datasets = list(data[patient].keys())
             npData = data[patient][datasets[0]]
             x = pd.DataFrame(npData.T,columns=features)
@@ -194,7 +191,7 @@ class STATS:
             full_labels[x_clean.index] = labels  #I got the outliers labels (1,-1) for the original dataset, the nan value mantains but for the plot it doesnt matter (the plot ignores it)
             outliers_iso = x[full_labels == -1]
             amountOut = (len(outliers_iso)/len(x))*100
-            ot_isf[patient] = amountOut
+            ot_isf.loc[patient] = amountOut
         savefile = os.path.join(savefolder, "outliers_isolationForest.csv")
         ot_isf.to_csv(savefile)
 
@@ -208,19 +205,19 @@ class STATS:
         if data_analysis is not None:
             x = data_analysis
 
-        x = data[patient][dataset+"_"+patient][feature]
+        x = data[patient][dataset][feature]
         x = pd.Series(x)
         n = len(x)
-        print(features[feature],n)
+        print(features[feature],"samples: ",n)
 
         if (x.isna()).any():
             l = x.isna().sum()
-            l_per = l/n
-            signal = x[x.isna()].index()
+            l_per = 100*(l/n)
+            signal = x[x.isna()].index
             id = []
             for i in signal:
                 id.append(segment_ids[patient][i])
-            print(features[feature],"Nan value",x[x.isna()],"number",x.isna().sum(),"percentage",l_per)
+            print("Feature with nan value: ",features[feature], "\nPosition of the nan value",x[x.isna()],"\nNumber of nans",x.isna().sum()," - ",l_per,"%")
 
         ### Ploting the distribution with a histogram
         plt.figure(figsize=(6, 6))
@@ -229,7 +226,7 @@ class STATS:
         plt.xlabel('Value')
         plt.ylabel('Frequency')
         plt.tight_layout()
-        plt.show()
+        # plt.show()
         plt.close()
 
         ### Scipy normality test, still recommended to check the QQ plots in the case of large data (samples >300)
@@ -241,6 +238,7 @@ class STATS:
             else:
                 nt = "Normal"
                 # nf+=1
+            pvalue = normt.pvalue
         elif n > 3:
             normt = sc.shapiro(x)
             if normt.pvalue < 0.05: #Rejects the Null hypothesis
@@ -249,7 +247,9 @@ class STATS:
             else:
                 nt = "Normal"
                 # nf+=1
+            pvalue = normt.pvalue
         else:
+            pvalue = 0
             nt = "Not enough data: " + str(n)
 
         ### Other statistics 
@@ -261,7 +261,6 @@ class STATS:
         median = x.median()
         perc_25 = x.quantile(0.25)
         perc_75 = x.quantile(0.75)
-        pvalue = normt.pvalue
         other = pd.DataFrame([kurt,skew,iqr,std,mean,median,nt,pvalue,n],index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"],columns=[f"{features[feature]}"])
         stats_data[other.columns[0]]=other
 
@@ -304,83 +303,3 @@ class STATS:
         return stats_data,outliers_data
 
 
-
-data = {}
-segment_ids = {}
-listaFinal = []
-data_path = 'C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5'
-
-if data_path=="":
-    data_path = filedialog.askopenfilename(title='Select signals file', filetypes=[("Input Files", ".h5")])
-else:
-    data_path=data_path
-
-# Opens the archive read mode only with h5py
-with h5py.File(data_path, 'r') as f:
-    for group_name in f:
-        group = f[group_name]
-        data[group_name] = {}
-        for dtset_name in group:
-            data[group_name][dtset_name] = group[dtset_name][()]
-        segment_ids[group_name] = group["segments"][0]
-    ### The name and amount of fiducial points and features are the same for all patients
-    fiducial = f["p000001"]["segments"].attrs['fiducial_order']
-    features = f["p000001"]["mean_p000001"].attrs['features']
-    fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
-    features = [f.decode() if isinstance(f, bytes) else f for f in features]
-
-######################### Stadistical analysis #########################
-# Create an instance of the STATS class with the data, features, and save folder
-# You can change the savefolder to your desired path
-# Just by calling the class it will create the folders and save the results but you can also call the methods individually
-# Data is a dictionary with patients as keys and datasets as values
-# the datasets are dictionaries with the dataset name as keys and the data as values
-# be sure that the first 2 datasets are the ones you want to analyze
-# If you want to change the datasets to analyze, you can change the code in the class
-# Please enssure that the data is in the correct format and structure
-
-savefolder = "c:/Users/adhn565/Documents/Stats"
-stats = STATS(data=data, features=features, savefolder=savefolder, segment_ids=segment_ids)
-
-# Perform the analysis on features and save the results
-# If you want to use the function directly you can do it like this:
-# you need to pass the data to analize, it can be a list, and array or dataframe (1D)
-data_analysis = []
-stats_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
-outliers_data = pd.DataFrame(index=["IQR","MAD"])
-# If you want to save the boxplots you can specify the folder
-saveBP = os.path.join(savefolder, "BoxPlots")
-os.makedirs(saveBP, exist_ok=True)
-stats, outliers = stats.analysis_feat(data_analysis=data_analysis, stats_data=stats_data, outliers_data=outliers_data, save_BP=saveBP)
-
-# savefolder = "c:/Users/adhn565/Documents/Stats"
-# normal_feats = {}
-# for p in data.keys():
-#     save_folder = os.path.join(savefolder,p)
-#     os.makedirs(save_folder, exist_ok=True)
-#     full_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
-#     out_all = pd.DataFrame(index=["IQR","MAD"])
-#     print(p)
-#     normal_feats[p] = {"mean":[],"median":[]}
-#     for d in list(data[p].keys())[:2]:
-#         nf = 0
-#         save_QQ = os.path.join(save_folder,"QQplots_" + d.replace("_"+p,""))
-#         save_BP = os.path.join(save_folder,"BoxPlots_" + d.replace("_"+p,""))
-#         save_hist = os.path.join(save_folder,"Histograms_" + d.replace("_"+p,""))
-        
-#         os.makedirs(save_BP, exist_ok=True)
-#         os.makedirs(save_QQ, exist_ok=True)
-#         os.makedirs(save_hist, exist_ok=True)
-
-#         QQplot_all(p,save_QQ, dataset=d)
-#         Hist_all(p,save_hist,dataset=d)
-#         for f in range(0,len(features)):
-#             st_data,ot_data = analysis_feat(patient=p,feature=f,dataset=d,stats_data=full_data,outliers_data=out_all)
-#         st_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
-#         ot_data.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
-#         normal_feats[p][d.replace("_"+p,"")].append(nf)
-#     df_nf = pd.DataFrame(normal_feats)
-#     df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
-
-# plot_overPatients()
-# isolationForest(data)
