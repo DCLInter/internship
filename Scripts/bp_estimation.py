@@ -122,7 +122,7 @@ class BPModel_LightGBM:
         return df_pred_error
         
     
-    def grid_searchCV(self, param_grid, n_splits: int = 5, score: str = "neg_mean_squared_error"):
+    def grid_searchCV(self, param_grid, n_splits: int = 5, score = "neg_mean_squared_error"):
 
         groups = self.groups
         model = self.model

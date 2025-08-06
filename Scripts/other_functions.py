@@ -19,14 +19,14 @@ def bland_altman_plot(true, pred, label):
     diff = pred - true                      # Y
     mean_diff = np.mean(diff)
     std_diff = np.std(diff)
-
+    print(mean)
     plt.figure(figsize=(6, 4))
     plt.scatter(mean, diff, alpha=0.5)
     plt.axhline(mean_diff, color='red', linestyle='--', label=f"Mean: {mean_diff:.2f}")
     plt.axhline(mean_diff + 1.96 * std_diff, color='gray', linestyle='--', label='+ 1.96*SD')
     plt.axhline(mean_diff - 1.96 * std_diff, color='gray', linestyle='--', label='- 1.96*SD')
     plt.title(f"Bland-Altman Plot: {label}")
-    plt.xlabel('Mean (Pred - True)')
+    plt.xlabel('Mean')
     plt.ylabel('Difference (Pred - True)')
     plt.legend()
     plt.tight_layout()

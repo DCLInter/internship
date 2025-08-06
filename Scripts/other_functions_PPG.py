@@ -164,6 +164,7 @@ class Others:
         bm = Biomarkers(bm_defs=bm_defs, bm_vals=bm_vals, bm_stats=bm_stats)
         # Save PPG struct, fiducial points, biomarkers
         fp_new = Fiducials(fp.get_fp() + s.start_sig) # here the starting sample is added so that the results are relative to the start of the original signal (rather than the start of the analysed segment)
-        save_data(s=s, fp=fp_new, bm=bm, savingformat="csv", savingfolder=savingfolder)
+        if saving:
+            save_data(s=s, fp=fp_new, bm=bm, savingformat="csv", savingfolder=savingfolder)
         print("bm_vals",bm_defs)
     
