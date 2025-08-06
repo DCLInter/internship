@@ -67,8 +67,6 @@ class Cleaner:
 
         remove = self.remove
         clean_data = data
-        df = pd.DataFrame()
-        df.drop()
         for patient in remove.keys():
             print(patient)
             sig_rem = np.array(remove[patient])

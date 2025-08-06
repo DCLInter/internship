@@ -1,5 +1,5 @@
 from tkinter import filedialog
-from fearture_extraction import Feature_Extraction
+from Scripts.fearture_extraction import Feature_Extraction
 import numpy as np
 import pandas as pd
 

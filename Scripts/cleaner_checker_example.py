@@ -14,9 +14,9 @@ For the cleaning alone note that if you dont have "signal ids" it doesn't matter
 
 path_fiducials = "C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5"
 path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
-filename_report = "C:/Users/adhn565/Documents/Data/final_metrics_2.h5"
-filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_29_7_2025.h5"
-filename_csvReport = "C:/Users/adhn565/Documents/Data/report_28_7_2025.csv"
+filename_report = "C:/Users/adhn565/Documents/Data/metrics_6_8_2025.h5"
+filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_6_8_2025.h5"
+filename_csvReport = "C:/Users/adhn565/Documents/Data/report_6_8_2025.csv"
 
 # The thresholds are for the metrics implemented and follows this format and, you can change it
 thresholds = {
@@ -52,6 +52,7 @@ and the number of signals that were eliminated
 '''
 c = Cleaner(filename_report)
 dictFlags = c.detect()
+print(dictFlags["p000001"])
 # You can clean the data contaning the features or the original data with just the signals
 clean_data = c.clean(path_fiducials) # path_originalData
 c.csvReport(filename_csvReport)

@@ -87,6 +87,7 @@ class Others:
         segment_ids = self.segments_ids
         demo_info = self.demo_info
         s = specific_signal
+        
         if s in segment_ids[patient_id]:
             idx = list(segment_ids[patient_id]).index(s)
 
@@ -140,7 +141,7 @@ class Others:
         fp = Fiducials(fp=fiducials)
 
         # Plot fiducial points
-        plot_fiducials(s, fp, savingfolder, legend_fontsize=12, sig=s, show_fig= True, savefig=saving)
+        plot_fiducials(s, fp, savingfolder, legend_fontsize=12, show_fig= True)
 
         #Estimate Heart Rate
         num_beats=len(fp.sp)  # number of the beats
@@ -167,4 +168,5 @@ class Others:
         if saving:
             save_data(s=s, fp=fp_new, bm=bm, savingformat="csv", savingfolder=savingfolder)
         print("bm_vals",bm_defs)
+        print(num_beats)
     

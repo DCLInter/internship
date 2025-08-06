@@ -49,7 +49,7 @@ class Checker:
         n_fiducials = 16        ### 16 fiducial points
         windows = l//n_fiducials
         x2d = y[:windows * n_fiducials].reshape((windows, n_fiducials))
-        df_fiducials = pd.DataFrame(x2d,columns=self.fiducial).dropna(how="all")
+        df_fiducials = pd.DataFrame(x2d,columns=self.fiducial_order).dropna(how="all")
         if all:
             return patient_fiducials.T, df_fiducials
         return df_fiducials

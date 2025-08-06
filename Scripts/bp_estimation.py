@@ -9,7 +9,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
-from other_functions import bland_altman_plot
+from Scripts.other_functions import bland_altman_plot
 
 class BPModel_LightGBM:
     def __init__(self, data: dict, data_target: dict, target_label: list, default_model: bool, limit_data: int = 10000):

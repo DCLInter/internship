@@ -1,7 +1,7 @@
 import pyPPG
 
 import pandas as pd
-from bm_extraction2 import get_biomarkers
+from lib_changes.bm_extraction2 import get_biomarkers
 
 ###########################################################################
 ####################### Get Biomarkers of PPG Signal ######################
