@@ -29,26 +29,25 @@ with h5py.File(data_path, 'r') as f:
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 
 ######################### Stadistical analysis #########################
-# Create an instance of the STATS class with the data, features, and save folder
-# You can change the savefolder to your desired path
-# Just by calling the class it will create the folders and save the results but you can also call the methods individually
-# Data is a dictionary with patients as keys and datasets as values
-# the datasets are dictionaries with the dataset name as keys and the data as values
-# be sure that the first 2 datasets are the ones you want to analyze
-# If you want to change the datasets to analyze, you can change the code in the class
-# Please enssure that the data is in the correct format and structure
-
+'''Create an instance of the STATS class with the data, features, and save folder
+You can change the savefolder to your desired path
+Just by calling the class it will create the folders and save the results but you can also call the methods individually
+Data is a dictionary with patients as keys and datasets as values
+the datasets are dictionaries with the dataset name as keys and the data as values
+be sure that the first 2 datasets are the ones you want to analyze
+If you want to change the datasets to analyze, you can change the code in the class
+Please enssure that the data is in the correct format and structure
+'''
 savefolder = "C:/Users/adhn565/Documents/Stats"
 stats = STATS(data=data, features=features, savefolder=savefolder, segment_ids=segment_ids)
 
 ##### Perform the analysis on features and save the results #####
-##### If you want to use the function directly you can do it like this: #####
-
-# you need to pass the data to analize, it can be a list, and array or dataframe (1D)
+'''If you want to use the function directly you can do it like this:
+you need to pass the data to analize, it can be a list, and array or dataframe (1D)'''
 # data_analysis = []
 # stats_data = pd.DataFrame(index=["Kurtosis","Skewness","IQR","STD","Mean","Median","Distribution","pvalue","Samples"])
 # outliers_data = pd.DataFrame(index=["IQR","MAD"])
-# # If you want to save the boxplots you can specify the folder
+'''If you want to save the boxplots you can specify the folder'''
 # saveBP = os.path.join(savefolder, "BoxPlots")
 # os.makedirs(saveBP, exist_ok=True)
 # stats, outliers = stats.analysis_feat(data_analysis=data_analysis, stats_data=stats_data, outliers_data=outliers_data, save_BP=saveBP)
