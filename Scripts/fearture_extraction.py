@@ -168,7 +168,8 @@ class Feature_Extraction():
                 bm_df = bm_vals["ppg_features"]
                 df = bm_df.drop(columns="TimeStamp")
                 Tpp = bm_df["Tpp"]
-                
+                # if self.segment_ids[i][sig] == 55:
+                #     print(df["IPR"],np.mean(df["IPR"]))
                 # PRV (pulse rate variability), we need the data of the whole segment to calculate the PRV (change in the time between beats)
                 # The array needs to be bigger have more than 1 element or it wont work
                 if len(Tpp) > 0:

@@ -15,4 +15,4 @@ data = fext.data
 demo_info = fext.demo_info
 ids = fext.segment_ids
 extra = Others(data=data,demo_info=demo_info,segments_ids=ids)
-extra.signal_analysisPPG("p000001",specific_signal=163)
+extra.signal_analysisPPG("p000001",specific_signal=55)

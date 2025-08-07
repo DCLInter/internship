@@ -40,20 +40,20 @@ the report will just add a column to this dataframe with a flag (0 or 1) where 1
 '''
 ck = Checker(path_fiducials,thresholds)
 dictScore = ck.metrics()
-dictResults = ck.results()
-ck.report()
-dictReport = ck.df_results
-ck.h5format(filename_report)
+# dictResults = ck.results()
+# ck.report()
+# dictReport = ck.df_results
+# ck.h5format(filename_report)
 
 ### Cleaning  the original dataset based on the report of the Checker
 ''' The cleanear wil read the report generate by the checker and will only use the "report" column to eliminate the signals an create a new .h5 file
 with the remaning signals, it wont modify the original data, as an extra the "csvReport" function will generate a resume for each group of the 4 metrics
 and the number of signals that were eliminated
 '''
-c = Cleaner(filename_report)
-dictFlags = c.detect()
-print(dictFlags["p000001"])
+# c = Cleaner(filename_report)
+# dictFlags = c.detect()
+# print(dictFlags["p000001"])
 # You can clean the data contaning the features or the original data with just the signals
-clean_data = c.clean(path_fiducials) # path_originalData
-c.csvReport(filename_csvReport)
-c.saveh5(filename_cleanData)
+# clean_data = c.clean(path_fiducials) # path_originalData
+# c.csvReport(filename_csvReport)
+# c.saveh5(filename_cleanData)

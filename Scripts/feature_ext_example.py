@@ -1,10 +1,10 @@
 from tkinter import filedialog
-from Scripts.fearture_extraction import Feature_Extraction
+from fearture_extraction import Feature_Extraction
 import numpy as np
 import pandas as pd
 
 #### Feature extraction ####
-data_path = 'patient_data.h5'
+data_path = 'C:/Users/adhn565/Documents/Data/patient_data.h5'
 filename_save = "a.h5"
 filename_csv = "a.csv"
 
