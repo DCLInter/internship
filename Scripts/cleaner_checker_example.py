@@ -38,8 +38,8 @@ the features extracted from those signals arent noise or are biased for badly lo
 Note that the dictResults for each key has a dataframe, that is the results of the metrics for each group of the .h5 file
 the report will just add a column to this dataframe with a flag (0 or 1) where 1 means we recommend discarding the signal or manually review the fiducials location
 '''
-ck = Checker(path_fiducials,thresholds)
-dictScore = ck.metrics()
+# ck = Checker(path_fiducials,thresholds)
+# dictScore = ck.metrics()
 # dictResults = ck.results()
 # ck.report()
 # dictReport = ck.df_results
@@ -50,10 +50,10 @@ dictScore = ck.metrics()
 with the remaning signals, it wont modify the original data, as an extra the "csvReport" function will generate a resume for each group of the 4 metrics
 and the number of signals that were eliminated
 '''
-# c = Cleaner(filename_report)
-# dictFlags = c.detect()
-# print(dictFlags["p000001"])
-# You can clean the data contaning the features or the original data with just the signals
+c = Cleaner(filename_report)
+dictFlags = c.detect()
+print(dictFlags["p000022"])
+## You can clean the data contaning the features or the original data with just the signals
 # clean_data = c.clean(path_fiducials) # path_originalData
 # c.csvReport(filename_csvReport)
 # c.saveh5(filename_cleanData)

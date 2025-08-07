@@ -86,18 +86,15 @@ class Others:
         data = self.data
         segment_ids = self.segments_ids
         demo_info = self.demo_info
-        s = specific_signal
-        
-        if s in segment_ids[patient_id]:
-            idx = list(segment_ids[patient_id]).index(s)
+        idx = list(segment_ids[patient_id]).index(specific_signal)
 
         print(f"Patient {patient_id} - signal {segment_ids[patient_id][idx]}")
 
         signal = DotMap()
         signal.name = patient_id
         signal.start_sig = 0 
-        signal.end_sig = len(data[patient_id][s])
-        signal.v = data[patient_id][s]
+        signal.end_sig = len(data[patient_id][idx])
+        signal.v = data[patient_id][idx]
         signal.fs = int(demo_info[patient_id]["SamplingFrequency"])
 
         signal.filtering = True # whether or not to filter the PPG signal

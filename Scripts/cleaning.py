@@ -136,7 +136,7 @@ class Cleaner:
             sc = df["combinedScore"].mean()
             stdS = df["combinedScore"].std()
 
-            numSignals = len(self.original_data[patient])
+            numSignals = len(self.original_data[patient]["segments"])
             numRemove = len(remove[patient])
 
             age = atributes[patient]["Age"][0]

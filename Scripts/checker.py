@@ -87,7 +87,7 @@ class Checker:
     
             idx = 0
             for sig in self.ids[patient]:
-                print(sig)
+                
                 ### Settings
                 fs = int(self.demo_info[patient]["SamplingFrequency"])
                 nsamples = self.Nsamples[patient][idx]

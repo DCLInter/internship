@@ -129,7 +129,6 @@ class Metrics:
             bmin = 50
             bmax = 180
         HRsig = np.mean(self.IPR)
-        print(HRsig, self.IPR)
         if bmin < HRsig and HRsig < bmax:
             flag = False
         else:
