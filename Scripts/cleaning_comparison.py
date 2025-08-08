@@ -25,7 +25,7 @@ class Comparator:
         score_mad = abs((array - median)/mad) if mad != 0 else np.full_like(array,0)
         
         outliers_iqr = array[(array < low_limit) | (array > high_limit)]
-        outliers_mad = array[score_mad > 3]
+        outliers_mad = array[score_mad*0.6745 > 3]
         
         feature = pd.Series(array)
         outliers_iqr_index = feature[(feature < low_limit) | (feature > high_limit)].index
