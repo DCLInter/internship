@@ -141,9 +141,9 @@ class FpCollection:
         up = self.set_beat_detection()                 #settings
         win_sec= 2.6 #### the window value cannot be to small or else the rest of the code will give errors
         w = int(fs * win_sec)                                    #window length(number of samples)
-        win_starts = np.array(list(range(0,len(x),round(0.8*w))))
+        win_starts = np.array(list(range(0,len(x),round(0.8*w))))   # Creates and array starting in 0 to the size of the signal,the array has numbers which will be positions jumping by the 80% of the size of the window
         win_starts = win_starts[0:min(np.where([win_starts >= len(x) - w])[1])]
-        win_starts = np.insert(win_starts,len(win_starts), len(x) + 1 - w)
+        win_starts = np.insert(win_starts,len(win_starts), len(x) + 1 - w)      # This is supposed to fix the final window to catch the end of the singla but its not working properly in the final detection of fp
 
         # before pre-processing
         hr_win=0  #the estimated systolic peak-to-peak distance, initially it is 0
