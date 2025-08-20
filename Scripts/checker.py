@@ -17,8 +17,10 @@ class Checker:
             for group_name in f:
                 group = f[group_name]
                 self.data[group_name] = {}
+
                 if "N-samples" in group["segments"].attrs:
                     self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
+
                 self.ids[group_name] = list(group["segments"][0])
                 self.ids[group_name] = self.ids[group_name][:len(self.ids[group_name])//2]
                 for dtset_name in group:
@@ -36,7 +38,7 @@ class Checker:
             self.fiducial_order = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
             self.features_names = [f.decode() if isinstance(f, bytes) else f for f in features]
 
-    def windows(self, patient: str, signal = None, all: bool = False):
+    def windows(self, patient: str, signal = None):
         
         idx = signal
         patient_fiducials = pd.DataFrame(self.data[patient]["segments"])
@@ -50,8 +52,7 @@ class Checker:
         windows = l//n_fiducials
         x2d = y[:windows * n_fiducials].reshape((windows, n_fiducials))
         df_fiducials = pd.DataFrame(x2d,columns=self.fiducial_order).dropna(how="all")
-        if all:
-            return patient_fiducials.T, df_fiducials
+    
         return df_fiducials
     
     def metrics(self):

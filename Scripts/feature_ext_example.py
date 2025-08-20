@@ -17,7 +17,7 @@ else:
 The class will read h5 file and extract the features from the signals
 Be sure that the h5 file has groups as patients and their dataset is the signals
 and that the first 4 columns of the dataset can be removed (they are not needed for the features)
-If you want you can input the data directly with the parameter "data", in a dictionary with this format:
+If you want you can input the data directly with the parameter "data_ext", in a dictionary with this format:
 '''
 # data = {
 #           "patient_id or whatever you want to call it": np.array( [signal1, signal2, ...] )
