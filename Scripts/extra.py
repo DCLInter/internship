@@ -17,6 +17,7 @@ demo_info = fext.demo_info
 ids = fext.segment_ids
 extra = Others(data=data,demo_info=demo_info,segments_ids=ids)
 extra.signal_analysisPPG("p000010",specific_signal=160)
+# extra.show_bypatient("p000001",100)
 
 # x = np.array([10,20,15,12,14,16,17,18,13,28,3])
 # Q1 = np.percentile(x, 25)

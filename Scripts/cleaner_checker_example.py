@@ -12,11 +12,11 @@ For the cleaning alone note that if you dont have "signal ids" it doesn't matter
 -  just know that the "signal ids" will be the first value of the signal 
 '''
 
-path_fiducials = "C:/Users/adhn565/Documents/Data/completo_conAttrs_16_7_25.h5"
+path_fiducials = "C:/Users/adhn565/Documents/Data/features_original.h5"
 path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
-filename_report = "C:/Users/adhn565/Documents/Data/metrics_6_8_2025.h5"
-filename_cleanData = "C:/Users/adhn565/Documents/Data/clean_6_8_2025.h5"
-filename_csvReport = "C:/Users/adhn565/Documents/Data/report_6_8_2025.csv"
+filename_report = "C:/Users/adhn565/Documents/Data/metrics.h5"
+filename_cleanData = "C:/Users/adhn565/Documents/Data/features_cleaned.h5"
+filename_csvReport = "C:/Users/adhn565/Documents/Data/general_report.csv"
 
 # The thresholds are for the metrics implemented and follows this format and, you can change it
 thresholds = {
@@ -43,6 +43,7 @@ dictScore = ck.metrics()
 dictResults = ck.results()
 ck.report()
 dictReport = ck.df_results
+print(dictResults.keys())
 ck.h5format(filename_report)
 
 ### Cleaning  the original dataset based on the report of the Checker
@@ -52,7 +53,7 @@ and the number of signals that were eliminated
 '''
 c = Cleaner(filename_report)
 dictFlags = c.detect()
-## You can clean the data contaning the features or the original data with just the signals
+### You can clean the data contaning the features or the original data with just the signals
 clean_data = c.clean(path_fiducials) # path_originalData
 c.csvReport(filename_csvReport)
 c.saveh5(filename_cleanData)

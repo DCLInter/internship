@@ -94,7 +94,7 @@ class Checker:
                 nsamples = self.Nsamples[patient][idx]
 
                 ### Adquaring the windows to analice per signal
-                df_fiducials = self.windows(patient,idx,all=False)
+                df_fiducials = self.windows(patient,idx)
 
                 ### Initializing dictionaries
                 for fidu in df_fiducials.columns:
