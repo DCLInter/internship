@@ -1,2 +1,4 @@
 # Ignore local configuration file
 local_paths.py
+*.h5
+Scripts/bp_lgbm/data_features/
