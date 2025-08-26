@@ -123,6 +123,17 @@ def print_tree(
 
     if isinstance(obj, h5py.Dataset):
         print(f"{head}[D] {name} :: {dataset_summary(obj)}")
+
+        # NEW: dataset attributes (when requested)
+        if show_attrs and len(obj.attrs) > 0:
+            cnt = 0
+            for k, v in obj.attrs.items():
+                if cnt >= max_attrs:
+                    print(prefix + (SPACE if is_last else PIPE) + f"   … {len(obj.attrs)-max_attrs} more attrs")
+                    break
+                print(prefix + (SPACE if is_last else PIPE) + f"   @ {k} = {safe_attr_repr(v, max_str)}")
+                cnt += 1
+
         if stats:
             s = compute_light_stats(obj, sample)
             if s:
