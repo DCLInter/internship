@@ -13,13 +13,95 @@ import pandas as pd
 from typing import List, Optional, Union
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# FUNCTIONS FOR EXPLORING H5 FILE ~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def show_h5_attributes(h5_path, key_path):
+    """
+    Display the attributes of a dataset or group inside an HDF5 file.
+
+    Args:
+        h5_path (str): Path to the .h5 file.
+        key_path (str): Path inside the HDF5 file, e.g., 'p000366/segments'.
+    
+    Returns:
+        dict: Attributes as a dictionary {attr_name: value}.
+    """
+    attrs_dict = {}
+    with h5py.File(h5_path, "r") as f:
+        if key_path not in f:
+            print(f"❌ Path '{key_path}' not found in file.")
+            return {}
+        
+        obj = f[key_path]  # can be group or dataset
+        print(f"📂 Inspecting: {key_path}")
+        for key, val in obj.attrs.items():
+            attrs_dict[key] = val
+            print(f"  @{key} = {val}")
+    return attrs_dict
+
+def inspect_dataset(file_path, group_name, dataset_name, head=5):
+    """
+    Inspect a specific dataset inside a group of an HDF5 file.
+    
+    Args:
+        file_path (str | Path): Path to the HDF5 file.
+        group_name (str): Name of the group (e.g. "p000366").
+        dataset_name (str): Name of the dataset (e.g. "mean_p000366", "segments").
+        head (int): Number of rows to preview.
+    
+    Returns:
+        dict: summary report with keys {shape, dtype, attributes, preview}.
+    """
+    file_path = Path(file_path)
+    with h5py.File(file_path, "r") as f:
+        if group_name not in f:
+            raise KeyError(f"Group '{group_name}' not found in file.")
+        
+        group = f[group_name]
+        if dataset_name not in group:
+            raise KeyError(f"Dataset '{dataset_name}' not found in group '{group_name}'. "
+                           f"Available: {list(group.keys())}")
+        
+        ds = group[dataset_name]  # h5py.Dataset
+        arr = np.asarray(ds[()])  # load full dataset
+
+        # collect attributes
+        attrs = {k: v for k, v in ds.attrs.items()}
+
+        # build preview
+        preview = pd.DataFrame(arr).head(head)
+
+        report = {
+            "shape": ds.shape,
+            "dtype": ds.dtype,
+            "attributes": attrs,
+            "preview": preview
+        }
+
+        # print a small report
+        print(f"\n📊 Report for '{group_name}/{dataset_name}':")
+        print(f"  shape       : {ds.shape}")
+        print(f"  dtype       : {ds.dtype}")
+        if attrs:
+            print(f"  attributes  :")
+            for k, v in attrs.items():
+                print(f"    @{k} = {v}")
+        else:
+            print(f"  attributes  : None")
+        print(f"\n  First {head} rows:")
+        print(preview)
+
+        return report
+    
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FUNCTIONS FOR LOADING           ~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def load_patient_dataset(
     file_path: str | Path,
     dataset_type: str | None = None,  # optional now
-    column_names: Optional[List[str]] = None     # custom names for dataset columns
+    column_names: Optional[List[str]] = None     # user-specified names override
 ) -> pd.DataFrame:
     """
     Load one dataset type across all patients into a single DataFrame.
@@ -30,7 +112,8 @@ def load_patient_dataset(
                       If None and each patient group has only one dataset,
                       that dataset is used automatically.
         column_names: optional list of names for dataset columns.
-                      Length must match number of features in the dataset.
+                      If not provided, tries to use dataset's `features` attribute
+                      if available and matches dataset width.
     
 
     Returns:
@@ -61,11 +144,12 @@ def load_patient_dataset(
                 print(f"⚠️ Skipping {patient_id}, dataset {ds_name} not found")
                 continue
 
-            ds = group[ds_name][()]
-            arr = np.asarray(ds).T  # transpose: features x samples → samples x features
+            ds = group[ds_name] # Both Group and Dataset objects from the h5py library have attributes 
+            arr = np.asarray(ds[()]).T  # transpose: features x samples → samples x features
 
-            # --- column names handling ---
+            # --- column names priority ---
             if column_names is not None:
+                # user-specified override
                 if len(column_names) != arr.shape[1]:
                     raise ValueError(
                         f"Length of column_names ({len(column_names)}) does not "
@@ -73,7 +157,18 @@ def load_patient_dataset(
                     )
                 cols = column_names
             else:
-                cols = list(range(arr.shape[1]))  # default numeric names
+                # try dataset attribute 'features'
+                if "features" in ds.attrs:
+                    features = ds.attrs["features"]
+                    if len(features) == arr.shape[1]:
+                        cols = [str(f) for f in features]
+                    else:
+                        print(f"⚠️ Patient {patient_id}, 'features' length mismatch "
+                              f"(attr={len(features)}, data={arr.shape[1]}). Using default.")
+                        cols = list(range(arr.shape[1]))
+                else:
+                    # fallback into default numeric names
+                    cols = list(range(arr.shape[1]))
 
             # wrap into dataframe
             df = pd.DataFrame(arr, columns=cols)
@@ -162,16 +257,30 @@ def _stringify(val):
 data_path = local_paths.DATA_DIR /"features_cleaned.h5"
 labels_path = local_paths.LABELS_DIR / "BP_values.h5"
 bp_values_file = ("BP_values.h5")
+data_messy_path = local_paths.DATA_DIR /"features_original.h5"
 
+# Inspect h5 file - print the branches
 #inspect_file(data_path, show_attrs=True)
 #inspect_file(bp_values_file, show_attrs=True)
+#inspect_file(data_messy_path, show_attrs=True)
 
+# Inspect attributes of dataset 'segments' inside group 'p000366'
+#show_h5_attributes(data_path, "p000390/segments")
+#report = inspect_dataset(data_messy_path, "p000390", "segments")
+#print(report)
+"""
 df_features_mean = load_patient_dataset(data_path, dataset_type="mean")
+df_messy_feat_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
 labels_df = load_patient_dataset(labels_path, column_names=["SBP", "DBP", "MAP"])
 metadata_df = load_group_attributes(data_path)
-print(df_features_mean.shape)      
-#print(df_mean.head()) # show first rows with patient column
-print(df_features_mean.info())
+print(df_messy_feat_mean.shape)      
+print(df_messy_feat_mean.head()) # show first rows with patient column
+print(df_messy_feat_mean.info())
+
 
 print(metadata_df.head())
+print(metadata_df.info())
 
+value = metadata_df.loc[metadata_df["Patient"] == "p000390", "Total_signals"]
+print(value)
+"""
