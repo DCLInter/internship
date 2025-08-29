@@ -139,3 +139,16 @@ lightGBM_tiny_grid_3target = {
     "model__estimator__bagging_freq": [1],
 }
 
+lightGBM_small_grid_3target = {
+    "model__estimator__num_leaves": [31, 63],              # tree complexity
+    "model__estimator__max_depth": [5, 10],                # depth control
+    "model__estimator__learning_rate": [0.05, 0.1],        # stable vs faster
+    "model__estimator__n_estimators": [500, 1000],         # balance with LR
+    "model__estimator__min_data_in_leaf": [50, 100],       # regularization
+    "model__estimator__lambda_l1": [0, 1],                 # L1 reg
+    "model__estimator__lambda_l2": [0, 1],                 # L2 reg
+    "model__estimator__min_gain_to_split": [0.0, 0.1],     # split threshold
+    "model__estimator__feature_fraction": [0.8, 1.0],      # col sampling
+    "model__estimator__bagging_fraction": [0.8, 1.0],      # row sampling
+    "model__estimator__bagging_freq": [1],
+}
