@@ -152,3 +152,13 @@ lightGBM_small_grid_3target = {
     "model__estimator__bagging_fraction": [0.8, 1.0],      # row sampling
     "model__estimator__bagging_freq": [1],
 }
+
+lightGBM_baseline_grid_3target = {
+    "model__estimator__num_leaves": [31, 63],          # tree complexity
+    "model__estimator__learning_rate": [0.05, 0.1],    # hot zone
+    "model__estimator__n_estimators": [500, 1000],     # complements LR
+    "model__estimator__min_data_in_leaf": [50, 100],   # regularization
+    "model__estimator__feature_fraction": [0.8, 1.0],  # col subsampling
+    "model__estimator__bagging_fraction": [0.8, 1.0],  # row subsampling
+    "model__estimator__bagging_freq": [1],
+}

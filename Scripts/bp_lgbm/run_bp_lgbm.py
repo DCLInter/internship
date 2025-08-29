@@ -140,7 +140,9 @@ if __name__ == "__main__":
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
-                                            verbose=2
+                                            verbose=2,
+                                            search_mode="random",
+                                            n_iter=100
                                             )
     
     print("Best parameters:", search.best_params_)

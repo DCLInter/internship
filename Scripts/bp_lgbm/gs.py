@@ -12,7 +12,7 @@ Note: It uses CV, either pateint wise or sample wise
 import pandas as pd
 import os
 from datetime import datetime
-from sklearn.model_selection import GridSearchCV, GroupKFold, KFold
+from sklearn.model_selection import GridSearchCV, GroupKFold, KFold, RandomizedSearchCV
 
 
 def run_grid_search(
@@ -27,6 +27,8 @@ def run_grid_search(
     n_jobs: int = -1,
     verbose: int = 2,
     save_results: bool = False,
+    search_mode="grid",
+    n_iter=100
 ):
     """
     Run grid search over a given pipeline with patient-wise (GroupKFold) or sample-wise (KFold) CV.
@@ -41,6 +43,8 @@ def run_grid_search(
         scoring: sklearn scoring string (default MSE)
         n_jobs: parallel jobs
         verbose: verbosity
+        search_mode: "grid" or "random". grid does the full grid search whereas random conducts randomized grid search.
+        n_iter: how many different combinations does the random select.
 
     Returns:
         search: fitted GridSearchCV object
@@ -57,17 +61,30 @@ def run_grid_search(
     else:
         raise ValueError("cv_type must be 'group' or 'sample'")
 
-    search = GridSearchCV(
-        estimator=pipeline,
-        param_grid=param_grid,
-        scoring=scoring,
-        cv=cv_split,
-        n_jobs=n_jobs,
-        refit=True,   # refit best model on all training data
-        verbose=verbose,
-        return_train_score=True,
-    )
-
+    if search_mode == "grid":
+        search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=param_grid,
+            scoring=scoring,
+            cv=cv_split,
+            n_jobs=n_jobs,
+            refit=True,   # refit best model on all training data
+            verbose=verbose,
+            return_train_score=True,
+        )
+    elif search_mode == "random":
+        search = RandomizedSearchCV(
+            estimator=pipeline,
+            param_distributions=param_grid,
+            n_iter=n_iter,
+            cv=cv,
+            scoring="neg_mean_squared_error",
+            n_jobs=-1,
+            verbose=verbose,
+            random_state=42
+        )
+    else:
+        raise ValueError(f"Unknown search_mode: {search_mode}")
     search.fit(X, y)
 
     # convert results into a dataframe
