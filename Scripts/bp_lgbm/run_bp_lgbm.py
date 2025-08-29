@@ -3,12 +3,19 @@
 # Here, all of the functions are going to be called           #
 #                                                             #
 ###############################################################
-
-import local_paths
-from data import load_patient_dataset, load_group_attributes
-import preprocessing
-import lightgbm as lgb
 import numpy as np
+import local_paths
+import preprocessing
+import cv
+import gs
+from data import load_patient_dataset, load_group_attributes
+from models import build_lgbm
+from config import ExperimentConfig, lightGBM_default_params, lightGBM_tiny_grid_3target, save_config
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.multioutput import MultiOutputRegressor
+from pathlib import Path
+
 
 if __name__ == "__main__":
 
@@ -102,44 +109,52 @@ if __name__ == "__main__":
                                                     id_cols= ["Patient"]
                                                     )
     # =========================================================
-    # Standardize the dataset
-    #==========================================================
-    print("************************************************************")
-    print("Standarization")
-    print("************************************************************")
-    #preprocessing.check_standarization(df=df_features_mean)
-    X_df_train_scaled, scaler = preprocessing.standardize_z_score(X_df_train, exclude_cols=["Patient"])
-    preprocessing.check_standarization(df=X_df_train_scaled)
-
-    """
-    # Note: This scaler is used for new data and for inverse scalling if needed.
-    """
-
-    # Scalling the testing data as well.
-    numeric_cols = X_df_test.select_dtypes(include="number").columns
-    X_df_test_scaled = X_df_test.copy()
-    X_df_test_scaled[numeric_cols] = scaler.transform(X_df_test[numeric_cols])
-
-    # =========================================================
-    # Training the model
+    # Grid Search, standarization and CV happens inside.
     #==========================================================
     # drop ID columns before training
     id_cols = ["Patient"]
-    X_train = X_df_train_scaled.drop(columns=id_cols)
-    Y_train = Y_df_train["MAP"]   # or whatever target you want
+    targets = ["SBP", "DBP", "MAP"]
+    groups = X_df_train["Patient"]
+    X_train = X_df_train.drop(columns=id_cols)
+    Y_train = Y_df_train[targets]   # or whatever target you want
 
-    # train LightGBM
-    model = lgb.LGBMRegressor()
-    model.fit(X_train, Y_train)
+    # build the model
+    cfg = ExperimentConfig(n_splits=10,
+                           random_state=42, 
+                           experiment_name="Grid_Search_3Targets",
+                           model_params=lightGBM_default_params)
+    lgbm = build_lgbm(cfg)
+    model = MultiOutputRegressor(lgbm)
 
-    # Make predictions on train set (or use validation/test if you have it)
-    y_pred = model.predict(X_train)
+    # build the pipeline
+    pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("model", model)
+    ])
+    
+    search, results_df = gs.run_grid_search(pipeline=pipeline,
+                                            X=X_train,
+                                            y=Y_train,
+                                            groups=groups,
+                                            param_grid=lightGBM_tiny_grid_3target,
+                                            n_splits=cfg.n_splits,
+                                            cv_type="group",
+                                            save_results=True,
+                                            verbose=2
+                                            )
+    
+    print("Best parameters:", search.best_params_)
+    print("Best CV score (MSE):", -search.best_score_)
+    print("Best CV score (RMSE):", (-search.best_score_)**0.5)
 
-    # Absolute errors
-    abs_errors = np.abs(Y_train.values - y_pred)
+    best_params_clean = {k.replace("model__", ""): v 
+                     for k, v in search.best_params_.items()}
+    print(best_params_clean)
 
-    # Metrics
-    mae = abs_errors.mean()
-    mae_sd = abs_errors.std()
-
-    print(f"MAE: {mae:.3f} ± {mae_sd:.3f}")
+    # Update config with best hyperparameters
+    cfg.model_params.update(best_params_clean)
+    save_config(cfg, Path(f"configs/{cfg.experiment_name}.json"))
+    # =========================================================
+    # Eval. - with Testing set
+    #==========================================================
+    
