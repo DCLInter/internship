@@ -17,7 +17,7 @@ from pathlib import Path
 # ----------------------------
 @dataclass # Decorator only to create a class that holds data. (this creates the builder and so on automatically)
 class ExperimentConfig:
-    random_state: int = 42
+    random_state: int = 42 #
     n_splits: int = 5
     experiment_name: str = "baseline"
     model_params: dict = None
@@ -33,6 +33,26 @@ lightGBM_default_params = {
     "feature_fraction": 0.9,   # instead of colsample_bytree
     "lambda_l1": 0.0,          # instead of reg_alpha
     "lambda_l2": 0.0,          # instead of reg_lambda
+}
+
+lightGBM_best_guess_1 = {
+    # --- Core capacity ---
+    "num_leaves": 31,        # modest complexity, avoids overfitting
+    "max_depth": -1,         # let leaves control depth
+
+    # --- Learning dynamics ---
+    "learning_rate": 0.05,   # stable but not too slow
+    "n_estimators": 1000,    # complements low LR
+
+    # --- Regularization ---
+    "min_data_in_leaf": 50,  # avoids tiny, overfit leaves
+    "lambda_l1": 0.0,        # usually not needed
+    "lambda_l2": 1.0,        # light smoothing, helps generalization
+
+    # --- Subsampling ---
+    "feature_fraction": 0.8, # use 80% of features per tree
+    "bagging_fraction": 0.8, # use 80% of samples per tree
+    "bagging_freq": 1,       # resample every iteration
 }
 
 def save_config(cfg: ExperimentConfig, filepath: str):

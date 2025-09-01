@@ -30,7 +30,7 @@ def build_lgbm(cfg: Any) -> LGBMRegressor: #I have to tell that it receives a co
         **cfg.model_params,              # unpack hyperparameters dict. I am doing it this way, so I can keep the random state consistent throughout the experiments and just change the model params after each grid search iteration.
         random_state=cfg.random_state,   # still keep global random_state
         n_jobs=-1,
-        verbose = -1
+        verbose = 1
     )
 
 # ----------------------------

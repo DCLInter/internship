@@ -8,12 +8,15 @@ import local_paths
 import preprocessing
 import cv
 import gs
+import mutual_information as mi
+import shap_analysis as sa
 from data import load_patient_dataset, load_group_attributes
 from models import build_lgbm
-from config import ExperimentConfig, lightGBM_default_params, lightGBM_tiny_grid_3target, save_config
+from config import ExperimentConfig, lightGBM_default_params, lightGBM_baseline_grid_3target, save_config, lightGBM_best_guess_1
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
+from sklearn.metrics import mean_squared_error as mse
 from pathlib import Path
 
 
@@ -109,39 +112,44 @@ if __name__ == "__main__":
                                                     id_cols= ["Patient"]
                                                     )
     # =========================================================
-    # Grid Search, standarization and CV happens inside.
+    # Initialize model
     #==========================================================
     # drop ID columns before training
     id_cols = ["Patient"]
     targets = ["SBP", "DBP", "MAP"]
     groups = X_df_train["Patient"]
     X_train = X_df_train.drop(columns=id_cols)
-    Y_train = Y_df_train[targets]   # or whatever target you want
+    Y_train = Y_df_train[targets[2]]   # or whatever target you want
 
     # build the model
-    cfg = ExperimentConfig(n_splits=10,
+    cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
                            experiment_name="Grid_Search_3Targets",
-                           model_params=lightGBM_default_params)
+                           verbose = -1,
+                           model_params=lightGBM_best_guess_1)
     lgbm = build_lgbm(cfg)
     model = MultiOutputRegressor(lgbm)
 
     # build the pipeline
     pipeline = Pipeline([
         ("scaler", StandardScaler()),
-        ("model", model)
+        ("model", lgbm)
     ])
-    
+
+    # =========================================================
+    # Grid Search, standarization and CV happens inside.
+    #==========================================================
+    """
     search, results_df = gs.run_grid_search(pipeline=pipeline,
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_tiny_grid_3target,
+                                            param_grid=lightGBM_baseline_grid_3target,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
                                             verbose=2,
-                                            search_mode="random",
+                                            search_mode="grid",
                                             n_iter=100
                                             )
     
@@ -156,6 +164,47 @@ if __name__ == "__main__":
     # Update config with best hyperparameters
     cfg.model_params.update(best_params_clean)
     save_config(cfg, Path(f"configs/{cfg.experiment_name}.json"))
+    """
+    # =========================================================
+    # Cross validation for one guess. (given by chat)
+    #==========================================================
+    """
+    cv_results, cv_summary = cv.sample_wise_cv(pipeline, 
+                                                X_train, 
+                                                Y_train,
+                                                #groups=groups,  
+                                                n_splits=cfg.n_splits, 
+                                                metric_fn= mse)
+    cv.print_sample_wise_cv(cv_results, cv_summary)
+    """
+    # =========================================================
+    # Mutual Information Analysis
+    #==========================================================
+    """
+    print(f"Analysing - {X_train.columns[2]} - feature")
+    mi_results = mi.compute_mi_info_fraction(X_train[X_train.columns[18]], 
+                                             Y_train, 
+                                             k=5, 
+                                             verbose = True)
+    """
+    # =========================================================
+    # Shapley Analysis
+    #==========================================================
+
+    # I need to refit a model (this time over the full train dataset)
+    final_lgbm = pipeline.fit(X_train, Y_train)
+    """
+    # Pass the trained model to the shapley analyser
+    shap_values, explainer, feat_names = sa.compute_shap_values(final_lgbm, 
+                                                                X_train, 
+                                                                feature_names=X_df_train.columns, 
+                                                                verbose = True)
+
+    # Plot summary for SBP
+    sa.plot_shap_beeswarm_summary(shap_values, X_train, feature_names=feat_names, target_name="SBP", max_display=20)
+    """
+    avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(final_lgbm, X_train, Y_train, n_iter=10)
+
     # =========================================================
     # Eval. - with Testing set
     #==========================================================
