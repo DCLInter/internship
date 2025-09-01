@@ -23,7 +23,7 @@ If you want you to input the data directly with the parameter "data_ext", it nee
 #           "patient_id_1 or whatever you want to call it": np.array( [signal1, signal2, ...] )
 #           }
 
-ftext = Feature_Extraction(filename_save,filename_csv,data_path)
+ftext = Feature_Extraction(filename_save,filename_csv,data_path=data_path)
 ######### You can access to the signals with: #########
 # signals = ftext.data["name of the group in .h5 file"]
 
