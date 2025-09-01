@@ -20,7 +20,7 @@ with h5py.File(data_path, 'r') as f:
             data[group_name][dtset_name] = data[group_name][dtset_name]
     
     fiducial = f[group_name]["segments"].attrs['fiducial_order']
-    features = f[group_name][f"mean_{group_name}"].attrs['features']
+    features = f[group_name]["mean"].attrs['features']
     fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 
@@ -65,5 +65,5 @@ There is a function for feature ranking using the SHAP values
 #         "max_depth": -1,
 #         "num_leaves": 50
 #         }
-# bp.model_setup(parameters=parameters, valid_set=True)
+# bp.model_setup(parameters=parameters)
 # errors_test, errors_valid = bp.prediction(valid_set=True)

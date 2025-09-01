@@ -22,7 +22,7 @@ def plot(signal,peaks,valleys,show: bool =False, delay: int = 1):
 
 data = {}
 segment_ids = {}
-data_path = "C:/Users/adhn565/Documents/Data/patient_data.h5"
+data_path = "D:/U/Practicas_City_University_of_London/One_drive/Data/patient_data.h5"
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
         group = f[group_name]
@@ -34,6 +34,7 @@ with h5py.File(data_path, 'r') as f:
 # data = {k: data[k] for k in ["p000001"]}
 bp_values = {}
 a = 0
+
 for patient, data_df in data.items():
     print(patient)
     list_bp = []
@@ -123,9 +124,11 @@ for patient, data_df in data.items():
         plot(signal,peaks_clean,valleys_clean,show=show,delay=10)
 
     df_bp = pd.DataFrame(list_bp, columns=["SBP","DBP","MAP"])
+    df_bp["signal_id"] = segment_ids[patient][0:len(df_bp)]
     bp_values[patient] = df_bp
     
 print("Fallo completamente: ", a)
+
 with h5py.File("BP_values.h5", "w") as f:
     for patient, df in bp_values.items():
         group = f.create_group(patient)

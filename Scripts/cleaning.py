@@ -11,9 +11,9 @@ class Cleaner:
         with h5py.File(datapath, 'r') as f:
             for patient in f.keys():
                 grp = f[patient]
-                data = grp["Metrics"][:]
+                data = grp["Metrics"][1:]
                 columns = [c.decode() for c in grp.attrs["metrics"]]
-                index = [i for i in grp.attrs["ids"]]
+                index = grp["Metrics"][0]
                 self.ids[patient] = index
                 self.data[patient] = pd.DataFrame(data, columns=columns, index=index)
             self.metrics = columns
@@ -45,13 +45,11 @@ class Cleaner:
                 group = f[group_name]
                 dataset_names = list(group.keys())
                 original_ids[group_name] = group[dataset_names[0]][1]
-                original_ids[group_name] = original_ids[group_name][:len(original_ids[group_name])//2]
                 self.original_data[group_name] = {}
                 data[group_name] = {}
                 self.attributes[group_name] = {}
                 for dst_name in group:
                     self.original_data[group_name][dst_name] = group[dst_name][:].T
-                    self.original_data[group_name][dst_name] = self.original_data[group_name][dst_name][:len(self.original_data[group_name][dst_name])//2]
                     self.original_data[group_name][dst_name] = pd.DataFrame(self.original_data[group_name][dst_name],index=original_ids[group_name])
                     data[group_name][dst_name] = self.original_data[group_name][dst_name]
                     attribute = {}

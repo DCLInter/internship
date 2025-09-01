@@ -29,9 +29,9 @@ class STATS:
             for d in list_dataset[:2]:
                 print("Dataset: ",d)
                 nf = 0
-                save_QQ = os.path.join(save_folder,"QQplots_" + d.replace( "_"+p , ""))
-                save_BP = os.path.join(save_folder,"BoxPlots_" + d.replace( "_"+p , ""))
-                save_hist = os.path.join(save_folder,"Histograms_" + d.replace( "_"+p , ""))
+                save_QQ = os.path.join(save_folder,"QQplots_" + d)
+                save_BP = os.path.join(save_folder,"BoxPlots_" + d)
+                save_hist = os.path.join(save_folder,"Histograms_" + d)
                 
                 os.makedirs(save_BP, exist_ok=True)
                 os.makedirs(save_QQ, exist_ok=True)
@@ -47,7 +47,7 @@ class STATS:
                 
                 st_data.to_csv(os.path.join(save_folder, f"{d}.csv"),index=True)
                 ot_data.to_csv(os.path.join(save_folder, f"{d}_outliers.csv"),index=True)
-                normal_feats[p][d.replace( "_"+p , "" )].append(nf)
+                normal_feats[p][d].append(nf)
 
             df_nf = pd.DataFrame(normal_feats)
             df_nf.to_csv(os.path.join(savefolder,"NormalDistributions.csv"))
@@ -300,6 +300,6 @@ class STATS:
         # plt.show()
         plt.close()
 
-        return stats_data,outliers_data
+        return stats_data, outliers_data
 
 

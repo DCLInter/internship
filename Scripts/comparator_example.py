@@ -18,7 +18,7 @@ with h5py.File(data_path, 'r') as f:
         segment_ids[group_name] = group["segments"][0]
     
     fiducial = f[group_name]["segments"].attrs['fiducial_order']
-    features = f[group_name][f"mean_{group_name}"].attrs['features']
+    features = f[group_name]["mean"].attrs['features']
     fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 

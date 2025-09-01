@@ -58,7 +58,6 @@ class Metrics:
         l = [lppg,ld1,ld2,ld3]
         self.list_derivatives = {"ppg": lppg, "d1": ld1, "d2": ld2, "d3": ld3}
         numFlagFidu = 0
-        otro = 0
         winOverlap = {}
         flags = {}
         numPerDerivatives = {}
@@ -118,7 +117,7 @@ class Metrics:
                     cont +=1
             winOverlap["win"+str(win)] = cont
 
-        return dic_flags, numFlagFidu, winOverlap, otro
+        return dic_flags, numFlagFidu, winOverlap
     
     def checkHR(self):
 
