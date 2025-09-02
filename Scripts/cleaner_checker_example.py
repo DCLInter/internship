@@ -12,11 +12,11 @@ For the cleaning alone note that if you dont have "signal ids" it doesn't matter
 -  just know that the "signal ids" will be the first value of the signal 
 '''
 
-path_fiducials = "C:/Users/adhn565/Documents/Data/features_original.h5"
+path_fiducials = "D:/Documentos/GitHub/internship/features_patients.h5"
 path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
-filename_report = "C:/Users/adhn565/Documents/Data/metrics.h5"
-filename_cleanData = "C:/Users/adhn565/Documents/Data/features_cleaned.h5"
-filename_csvReport = "C:/Users/adhn565/Documents/Data/general_report.csv"
+filename_report = "metrics.h5"
+filename_cleanData = "features_patients_clean.h5"
+filename_csvReport = "general_report.csv"
 
 # The thresholds are for the metrics implemented and follows this format and, you can change it
 thresholds = {
