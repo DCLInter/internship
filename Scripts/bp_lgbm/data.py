@@ -4,10 +4,8 @@
 #                                                                                   #
 #####################################################################################
 
-import local_paths
 from pathlib import Path
 import h5py
-from h5_inspector import inspect_file
 import numpy as np
 import pandas as pd
 from typing import List, Optional, Union
@@ -135,10 +133,8 @@ def load_patient_dataset(
                         f"Please specify dataset_type explicitly."
                     )
                 ds_name = keys[0]
-            elif dataset_type == "segments":
-                ds_name = "segments"
-            else:
-                ds_name = f"{dataset_type}_{patient_id}"
+                
+            ds_name = dataset_type
 
             if ds_name not in group:
                 print(f"⚠️ Skipping {patient_id}, dataset {ds_name} not found")
@@ -253,34 +249,3 @@ def _stringify(val):
 
 
 #====================================================================
-# TESTING THE CODE
-data_path = local_paths.DATA_DIR /"features_cleaned.h5"
-labels_path = local_paths.LABELS_DIR / "BP_values.h5"
-bp_values_file = ("BP_values.h5")
-data_messy_path = local_paths.DATA_DIR /"features_original.h5"
-
-# Inspect h5 file - print the branches
-#inspect_file(data_path, show_attrs=True)
-#inspect_file(bp_values_file, show_attrs=True)
-#inspect_file(data_messy_path, show_attrs=True)
-
-# Inspect attributes of dataset 'segments' inside group 'p000366'
-#show_h5_attributes(data_path, "p000390/segments")
-#report = inspect_dataset(data_messy_path, "p000390", "segments")
-#print(report)
-"""
-df_features_mean = load_patient_dataset(data_path, dataset_type="mean")
-df_messy_feat_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
-labels_df = load_patient_dataset(labels_path, column_names=["SBP", "DBP", "MAP"])
-metadata_df = load_group_attributes(data_path)
-print(df_messy_feat_mean.shape)      
-print(df_messy_feat_mean.head()) # show first rows with patient column
-print(df_messy_feat_mean.info())
-
-
-print(metadata_df.head())
-print(metadata_df.info())
-
-value = metadata_df.loc[metadata_df["Patient"] == "p000390", "Total_signals"]
-print(value)
-"""

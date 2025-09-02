@@ -96,7 +96,7 @@ def compute_mi_info_fraction(X, y, k=5, verbose=True):
     return results
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def compute_mi_summary(X, y, compute_func, feature_names=None,
+def compute_mi_summary(X, y, feature_names=None,
                        target_name="target", k=5, save_path=None):
     """
     Wrapper that computes MI, entropy, Info-Fraction, and runtime for each feature
@@ -105,18 +105,14 @@ def compute_mi_summary(X, y, compute_func, feature_names=None,
 
     Parameters
     ----------
-    X : array-like of shape (n_samples, n_features)
-        Input features (NumPy array or DataFrame).
+    X : pandas.DataFrame or np.ndarray
+        Input features.
     
     y : array-like of shape (n_samples,)
-        Continuous target variable (NumPy array or Series).
-    
-    compute_func : callable
-        Function with signature compute_func(X, y, k=...) that returns
-        {"MI": float, "H": float, "Info-Fraction": float, "Runtime": float}.
+        Continuous target variable.
     
     feature_names : list of str, optional
-        Names of the features. If None, features are indexed numerically.
+        Names of the features. If None, use DataFrame columns (if available) or numeric indices.
     
     target_name : str, optional (default="target")
         Name of the target variable.
@@ -130,17 +126,24 @@ def compute_mi_summary(X, y, compute_func, feature_names=None,
     Returns
     -------
     results_df : pandas.DataFrame
-        DataFrame with MI, entropy, Info-Fraction, and Runtime for each feature
-        and for the collective feature set.
     """
+    # Handle feature names
     if feature_names is None:
-        feature_names = [f"f{i}" for i in range(X.shape[1])]
+        if isinstance(X, pd.DataFrame):
+            feature_names = X.columns.tolist()
+        else:
+            feature_names = [f"f{i}" for i in range(X.shape[1])]
 
     records = []
 
     # Per-feature MI
     for i, fname in enumerate(feature_names):
-        res = compute_func(X[:, i].reshape(-1, 1), y, k=k, verbose=True)
+        if isinstance(X, pd.DataFrame):
+            Xi = X.iloc[:, i].to_numpy().reshape(-1, 1)
+        else:  # numpy array
+            Xi = X[:, i].reshape(-1, 1)
+
+        res = compute_mi_info_fraction(Xi, y, k=k, verbose=True)
         records.append({
             "Target": target_name,
             "Feature": fname,
@@ -150,8 +153,13 @@ def compute_mi_summary(X, y, compute_func, feature_names=None,
             "Runtime": res["Runtime"]
         })
 
-    # Collective MI
-    res_all = compute_func(X, y, k=k, verbose=True)
+    # Collective MI (all features)
+    if isinstance(X, pd.DataFrame):
+        X_all = X.to_numpy()
+    else:
+        X_all = X
+
+    res_all = compute_mi_info_fraction(X_all, y, k=k, verbose=True)
     records.append({
         "Target": target_name,
         "Feature": "ALL_FEATURES",
