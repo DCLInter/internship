@@ -18,7 +18,7 @@ from lib_changes import biomarkers2 as BM2 ##Modified
 from other_functions_PPG import Others ### Class with some other functions
 
 class Feature_Extraction():
-    def __init__(self, data_path: str, h5name: str, csvname: str, data_ext: dict = None):
+    def __init__(self, h5name: str, csvname: str, data_ext: dict = None, data_path: str = ""):
         
         self.data = {}
         self.segment_ids = {}
@@ -29,34 +29,36 @@ class Feature_Extraction():
         self.median = {}
         self.empty = {}
 
-        self.data_path = data_path
         self.filename_save = h5name
         self.filename_csv = csvname
 
         # Opens the archive read mode only with h5py
-        with h5py.File(data_path, 'r') as f:
-            #This works if the archive has only 1 dataset for each group
-            for group_name in f:
-                group = f[group_name]
-                dataset_names = list(group.keys())
-                dataset_names = dataset_names[:]
-                if dataset_names:
-                    ### [4:] used to eliminate the first 4 columns since they werent needed for the features
-                    self.data[group_name] = group[dataset_names[0]][4:].T
-                    self.segment_ids[group_name] =  group[dataset_names[0]][1].T
-            # Aquires the attributes of each group
-            for group_name in f.keys():
-                group = f[group_name]
-                if group_name not in self.demo_info:
-                    self.demo_info[group_name] = {}
-                for attr_name, attr_value in group.attrs.items():
-                    self.demo_info[group_name][attr_name] = attr_value
+        if data_path != "":
+            with h5py.File(data_path, 'r') as f:
+                #This works if the archive has only 1 dataset for each group
+                for group_name in f:
+                    group = f[group_name]
+                    dataset_names = list(group.keys())
+                    dataset_names = dataset_names[:]
+                    if dataset_names:
+                        ### [4:] used to eliminate the first 4 columns since they werent needed for the features
+                        self.data[group_name] = group[dataset_names[0]][4:].T
+                        self.data[group_name] = self.data[group_name][0: len(self.data[group_name])//2 ]
+                        self.segment_ids[group_name] =  group[dataset_names[0]][1].T
+                        self.segment_ids[group_name] = self.segment_ids[group_name][0: len(self.segment_ids[group_name])//2 ]
+                # Aquires the attributes of each group
+                for group_name in f.keys():
+                    group = f[group_name]
+                    if group_name not in self.demo_info:
+                        self.demo_info[group_name] = {}
+                    for attr_name, attr_value in group.attrs.items():
+                        self.demo_info[group_name][attr_name] = attr_value
 
         if data_ext is not None:
             self.data = data_ext
             self.demo_info = {}
 
-        #self.data = {k: self.data[k] for k in ["p000010"] if k in self.data} # This is to change the amount of data you want to analyze
+        #self.data = {k: self.data[k] for k in ["p000001"] if k in self.data} # This is to change the amount of data you want to analyze
 
     def  save_h5(self, fiducials: dict, means: dict, medians: dict, fiducials_names: list, filename: str):
         demo_info = self.demo_info
@@ -77,10 +79,10 @@ class Feature_Extraction():
                 # As an additional attribute for "segments" the number of samples were added for each signal
                 dset.attrs["N-samples"] = samples[patient_id]
                 stats1 = means[patient_id]
-                me = grp.create_dataset(f"mean_{patient_id}",data=stats1.to_numpy(dtype = float, na_value = np.nan))
+                me = grp.create_dataset("mean",data=stats1.to_numpy(dtype = float, na_value = np.nan))
                 me.attrs["features"] = np.array(stats1.index.tolist(), dtype= 'S')
                 stats2 = medians[patient_id]
-                med = grp.create_dataset(f"median_{patient_id}",data=stats2.to_numpy(dtype = float, na_value = np.nan))
+                med = grp.create_dataset("median",data=stats2.to_numpy(dtype = float, na_value = np.nan))
                 med.attrs["features"] = np.array(stats2.index.tolist(), dtype= 'S')
 
     def stats_features(self, features: pd.DataFrame):
@@ -150,7 +152,7 @@ class Feature_Extraction():
 
                 # Just saving the names of the fiducials for later use in the h5 file
                 df = pd.DataFrame(fiducials)
-                if  sig == len(data[i])-1:
+                if  sig == 0:
                     fp_col = df.columns
                 else:
                     pass
@@ -209,7 +211,9 @@ class Feature_Extraction():
             signal_dict[i] = fp_pt.T
             fp_col.insert(0,"segment_ID")
             # Saving the mean and median of the features per signal for each patient
+            ft_pt_mean.insert(0,"segment_ID",segment_ids[i])
             mean[i] = ft_pt_mean.T
+            ft_pt_median.insert(0,"segment_ID",segment_ids[i])
             median[i] = ft_pt_median.T
 
         #### If you want to save the data when it changes between patients just move it inside the loop, it will work

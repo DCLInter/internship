@@ -23,8 +23,8 @@ with h5py.File(data_path, 'r') as f:
             data[group_name][dtset_name] = group[dtset_name][()]
         segment_ids[group_name] = group["segments"][0]
     ### The name and amount of fiducial points and features are the same for all patients
-    fiducial = f["p000001"]["segments"].attrs['fiducial_order']
-    features = f["p000001"]["mean_p000001"].attrs['features']
+    fiducial = f[group_name]["segments"].attrs['fiducial_order']
+    features = f[group_name]["mean"].attrs['features']
     fiducial = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
     features = [f.decode() if isinstance(f, bytes) else f for f in features]
 

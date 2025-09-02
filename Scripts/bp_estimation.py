@@ -16,7 +16,7 @@ class BPModel_LightGBM:
 
         dataframe_X = pd.DataFrame(columns=features_list)
         for p in data.keys():
-            p_array = data[p][f"mean_{p}"].T
+            p_array = data[p]["mean"].T
             p_array = p_array[:len(p_array)//2]
             col_p = np.full(len(p_array), p, dtype=object)
             p_df = pd.DataFrame(p_array,columns=features_list)
@@ -28,8 +28,10 @@ class BPModel_LightGBM:
         df_target = pd.DataFrame(columns= target_label)
         for p in data.keys():
             p_array = data_target[p]["Bp_values"].T
-            p_df = pd.DataFrame(p_array,columns= target_label)
+            target_label = target_label.insert(-1,"id")
+            p_df = pd.DataFrame(p_array,columns = target_label)
             df_target = pd.concat([df_target,p_df],ignore_index=True)
+        df_target = df_target.drop(columns="id")
 
         dataframe_X = dataframe_X[:limit_data]
         groups = groups[:limit_data]
@@ -39,7 +41,7 @@ class BPModel_LightGBM:
         self.target = df_target
         self.groups = groups
         self.target_label = target_label
-        self.model_setup(valid_set=True)
+        self.model_setup()
         self.split(valid_set=True)
         if default_model:
             self.error_test, self.error_valid = self.prediction(valid_set=True, shap=True)
@@ -80,7 +82,7 @@ class BPModel_LightGBM:
 
         return X_train, y_train, X_test, y_test
     
-    def model_setup(self, parameters: dict = None, valid_set: bool = False):
+    def model_setup(self, parameters: dict = None):
 
         default_params = {
         "random_state": 42,

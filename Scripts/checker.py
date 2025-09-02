@@ -22,7 +22,7 @@ class Checker:
                     self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
 
                 self.ids[group_name] = list(group["segments"][0])
-                self.ids[group_name] = self.ids[group_name][:len(self.ids[group_name])//2]
+                
                 for dtset_name in group:
                     self.data[group_name][dtset_name] = group[dtset_name][()]
                     if dtset_name == "segments":
@@ -34,7 +34,7 @@ class Checker:
                     self.demo_info[group_name][attr_name] = attr_value   
             ### The name and amount of fiducial points and features are the same for all patients
             fiducial = f[group_name]["segments"].attrs['fiducial_order']
-            features = f[group_name][f"mean_{group_name}"].attrs['features']
+            features = f[group_name]["mean"].attrs['features']
             self.fiducial_order = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
             self.features_names = [f.decode() if isinstance(f, bytes) else f for f in features]
 
@@ -42,8 +42,6 @@ class Checker:
         
         idx = signal
         patient_fiducials = pd.DataFrame(self.data[patient]["segments"])
-        bp_sigs = np.arange(len(patient_fiducials.columns)//2,len(patient_fiducials.columns))
-        patient_fiducials = patient_fiducials.drop(bp_sigs,axis=1)
         patient_fiducials.columns = self.ids[patient]
         
         y = patient_fiducials.iloc[:,idx].values
@@ -116,7 +114,7 @@ class Checker:
                 if numSP == True:
                     lowsp.append(sig)
                 
-                wrongOrdFidu, numFlags, winFlags, otro = metrics.checkOrder(wrongOrdFidu,patient,sig)
+                wrongOrdFidu, numFlags, winFlags = metrics.checkOrder(wrongOrdFidu,patient,sig)
                 wNum = len(winFlags.keys())
                 fpNum = wNum*16
 
@@ -153,7 +151,7 @@ class Checker:
                 comScores = metrics.scoreCombined()
                 scores[patient][sig] = comScores
                 for fp in comScores.keys():
-                    if (comScores[fp] < 90).any():
+                    if (comScores[fp] < 80).any():
                         flagScores[patient][fp].append(sig)
                 
                 idx+=1
@@ -174,8 +172,8 @@ class Checker:
                             "checkOrderFiducials": wrongOrdFidu, ### signals with at least 1 fiducial overlapped or NA value
                             "numberOverlapFiducials": number_overlapFiducial, ### signals with at least 1 overlapped fiducial
                             "numberOverlapWindows": number_overlapWindows, ### number of windows of the signal that has any fiducial point overlapped
-                            "flagForScore": flagScores, ### signals that didnt meet the threshold for the score
-                            "combinedScore": scores, ### scores divided by each fiducial points per signal
+                            "flagForScore": flagScores, ### signals that didnt meet the threshold for the score (80)
+                            "combinedScore": scores, ### scores (by windows) divided by each fiducial points per signal
                             "numberProperFiducials":number_fiducialsDetect, ### percentage of fiducials properly detected
                             "numberProperFiducials_byDerivatives": number_derivativesDetected ### percentage for each derivative
                             }
@@ -269,8 +267,8 @@ class Checker:
         with h5py.File(filename, 'w') as f:
             for patient, df in all_results.items():
                 grp = f.create_group(patient)
+                df["ids"] = list(df.index)
                 grp.create_dataset("Metrics", data=df.to_numpy())
     
                 grp.attrs["metrics"] = np.array(df.columns, dtype="S")
-                grp.attrs["ids"] = np.array(list(df.index) ,dtype=float)
         
