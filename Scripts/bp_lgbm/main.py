@@ -12,7 +12,7 @@ import mutual_information as mi
 import shap_analysis as sa
 from data import load_patient_dataset, load_group_attributes
 from models import build_lgbm
-from config import ExperimentConfig, lightGBM_default_params, lightGBM_baseline_grid_3target, save_config, lightGBM_best_guess_1
+from config import ExperimentConfig, lightGBM_default_params, lightGBM_baseline_grid_3target, save_config, lightGBM_best_guess_1, lightGBM_small_grid
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
@@ -84,6 +84,18 @@ if __name__ == "__main__":
     print(XY_df.head())
     print(XY_df.info())
 
+
+    #~~~~~~~~~~ Testing pipeline only ~~~~~~~~~~~~~~~~~~~~~~~~
+    # Count signals per patient
+    counts = XY_df.groupby("Patient").size()
+
+    # Get top 5 patients
+    top5_patients = counts.nlargest(5).index   # patient IDs of top 5
+
+    # If you want to extract all their rows:
+    top5_XY_df = XY_df[XY_df["Patient"].isin(top5_patients)]
+    print(top5_XY_df.info())
+    
     # =========================================================
     # Splitting process of the dataset IDs - patyient wise
     #==========================================================
@@ -102,7 +114,7 @@ if __name__ == "__main__":
     # =========================================================
     # Splitting into X and Y
     #==========================================================
-    X_df_train, Y_df_train = preprocessing.split_XY(df_train,
+    X_df_train, Y_df_train = preprocessing.split_XY(top5_XY_df,
                                                     target_cols= ["SBP", "DBP", "MAP"],
                                                     id_cols= ["Patient"]
                                                     )
@@ -119,12 +131,12 @@ if __name__ == "__main__":
     targets = ["SBP", "DBP", "MAP"]
     groups = X_df_train["Patient"]
     X_train = X_df_train.drop(columns=id_cols)
-    Y_train = Y_df_train[targets[2]]   # or whatever target you want
+    Y_train = Y_df_train[targets]   # or whatever target you want
 
     # build the model
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
-                           experiment_name="Grid_Search_3Targets",
+                           experiment_name="Grid_Search_3Targets_top5_subjects",
                            verbose = -1,
                            model_params=lightGBM_best_guess_1)
     lgbm = build_lgbm(cfg)
@@ -133,22 +145,22 @@ if __name__ == "__main__":
     # build the pipeline
     pipeline = Pipeline([
         ("scaler", StandardScaler()),
-        ("model", lgbm)
+        ("model", model)
     ])
 
     # =========================================================
     # Grid Search, standarization and CV happens inside.
     #==========================================================
-    """
+    
     search, results_df = gs.run_grid_search(pipeline=pipeline,
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_baseline_grid_3target,
+                                            param_grid=lightGBM_small_grid,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
-                                            verbose=2,
+                                            verbose=0,
                                             search_mode="grid",
                                             n_iter=100
                                             )
@@ -164,11 +176,11 @@ if __name__ == "__main__":
     # Update config with best hyperparameters
     cfg.model_params.update(best_params_clean)
     save_config(cfg, Path(f"configs/{cfg.experiment_name}.json"))
-    """
+    
     # =========================================================
-    # Cross validation for one guess. (given by chat)
+    # Cross validation.
     #==========================================================
-    """
+    
     cv_results, cv_summary = cv.sample_wise_cv(pipeline, 
                                                 X_train, 
                                                 Y_train,
@@ -176,7 +188,7 @@ if __name__ == "__main__":
                                                 n_splits=cfg.n_splits, 
                                                 metric_fn= mse)
     cv.print_sample_wise_cv(cv_results, cv_summary)
-    """
+    
     # =========================================================
     # Mutual Information Analysis
     #==========================================================
@@ -187,6 +199,7 @@ if __name__ == "__main__":
                                              k=5, 
                                              verbose = True)
     """
+    mi_results = mi.compute_mi_summary(X_train, Y_train, X_train.columns, "SBP", k = 5, save_path=Path(f"mi_results/SBP.csv"))
     # =========================================================
     # Shapley Analysis
     #==========================================================

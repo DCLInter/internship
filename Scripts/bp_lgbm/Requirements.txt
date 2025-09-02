@@ -1,0 +1,26 @@
+# Core scientific stack
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+
+# Gradient boosting
+lightgbm
+
+# Explainability / feature importance
+shap
+
+# Visualization
+matplotlib
+seaborn
+plotly  # if you want interactive plots
+tqdm    # for progress bars
+
+# Data formats
+h5py
+openpyxl  # if you read Excel files
+PyYAML    # if you store configs in YAML
+
+# Mutual information package you use
+NPEET @ git+https://github.com/gregversteeg/NPEET.git@8b0d9485423f74e5eb199324cf362765596538d3

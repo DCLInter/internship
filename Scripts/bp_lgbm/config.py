@@ -20,6 +20,7 @@ class ExperimentConfig:
     random_state: int = 42 #
     n_splits: int = 5
     experiment_name: str = "baseline"
+    verbose:int = -1
     model_params: dict = None
 
 # ----------------------------
@@ -181,4 +182,11 @@ lightGBM_baseline_grid_3target = {
     "model__estimator__feature_fraction": [0.8, 1.0],  # col subsampling
     "model__estimator__bagging_fraction": [0.8, 1.0],  # row subsampling
     "model__estimator__bagging_freq": [1],
+}
+
+# Small grid: quick runs
+lightGBM_small_grid = {
+    "model__estimator__num_leaves": [31, 63],
+    "model__estimator__learning_rate": [0.05, 0.1],
+    "model__estimator__n_estimators": [200, 500],
 }
