@@ -10,8 +10,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from typing import Dict, List
 import h5py
-from typing import List, Tuple
-
+from typing import List, Tuple, Union, Optional
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FUNCTIONS FOR SPLITTING         ~
@@ -137,7 +136,7 @@ def split_train_test(XY: pd.DataFrame, split_results: dict, patient_col: str = "
 def split_XY(
     XY: pd.DataFrame,
     target_cols: List[str],
-    id_cols: List[str] = ["Patient", "Segment_ID"]
+    id_cols: List[str] = ["Patient", "segment_ID"]
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Split XY dataframe into X (features) and Y (targets).
@@ -350,52 +349,176 @@ def add_segment_id(X: pd.DataFrame,
 
     return X_new, Y_new
 
-import pandas as pd
-
-def drop_abp_features(df: pd.DataFrame, patient_col: str = "Patient") -> pd.DataFrame:
+def drop_abp_features(
+    df: pd.DataFrame,
+    patient_col: Union[str, List[str]] = "Patient"
+) -> pd.DataFrame:
     """
-    Drop the last half of rows for each patient in the DataFrame.
+    Drop the last half of rows for each group (defined by patient_col)
+    in the DataFrame.
 
     Args:
-        df: Input DataFrame with a patient identifier column.
-        patient_col: Name of the column that contains patient codes (default="Patient").
+        df: Input DataFrame.
+        patient_col: Column name or list of column names to group by
+                     (default="Patient").
 
     Returns:
-        A new DataFrame with only the first half of rows kept for each patient.
+        A new DataFrame with only the first half of rows kept for each group.
     """
     keep_rows = []
-    for patient_id, group in df.groupby(patient_col):
+    for group_id, group in df.groupby(patient_col):
         n = len(group)
         half = n // 2  # floor division, keeps first half if odd number
         keep_rows.extend(group.index[:half])  # take the first half
 
     return df.loc[keep_rows].reset_index(drop=True)
 
-def merge_XY(X: pd.DataFrame, Y: pd.DataFrame, on: str = None) -> pd.DataFrame:
+import pandas as pd
+from typing import Union, List, Optional
+
+def merge_XY(
+    X: pd.DataFrame,
+    Y: pd.DataFrame,
+    on: Optional[Union[str, List[str]]] = None
+) -> pd.DataFrame:
     """
     Merge X and Y DataFrames into one.
 
     Args:
         X: Features DataFrame.
         Y: Targets DataFrame.
-        on: Column name to merge on. If None:
-            - If 'Segment_ID' exists in both, use it.
-            - Otherwise, merge assuming correct order patient-wise.
+        on: Column name or list of column names to merge on. If None:
+            - Merge assuming correct order patient-wise.
 
     Returns:
         Merged DataFrame.
     """
-    # Case 1: explicit or Segment_ID present
-    if on is not None or ("Segment_ID" in X.columns and "Segment_ID" in Y.columns):
-        key = on if on is not None else "Segment_ID"
-        merged = pd.merge(X, Y, on=key, suffixes=("_X", "_Y"))
+    if on is not None:
+        # Merge on the user-specified column(s)
+        merged = pd.merge(X, Y, on=on, suffixes=("_X", "_Y"))
 
     else:
-        # Case 2: assume order matches within each patient
+        # Assume order matches within each patient
         if not all(X["Patient"].values == Y["Patient"].values):
-            raise ValueError("Patient order mismatch between X and Y. Cannot merge safely.")
-        
-        merged = pd.concat([X.reset_index(drop=True), 
-                            Y.drop(columns=["Patient"]).reset_index(drop=True)], axis=1)
+            raise ValueError(
+                "Patient order mismatch between X and Y. Cannot merge safely without keys."
+            )
+        merged = pd.concat(
+            [X.reset_index(drop=True),
+             Y.drop(columns=["Patient", "segment_ID"]).reset_index(drop=True)],
+            axis=1
+        )
 
     return merged
+
+def reset_segment_ids(df: pd.DataFrame, patient_col="Patient", segment_col="segment_ID") -> pd.DataFrame:
+    """
+    Reset segment IDs so they are unique and sequential per patient.
+
+    Args:
+        df : DataFrame
+            Input DataFrame with patient and segment columns.
+        patient_col : str
+            Name of the patient identifier column.
+        segment_col : str
+            Name of the segment identifier column.
+
+    Returns:
+        DataFrame with segment IDs reset per patient.
+    """
+    df = df.copy()
+    df[segment_col] = (
+        df.groupby(patient_col)
+          .cumcount()  # 0,1,2,... per patient
+    )
+    return df
+
+def find_uncommon_rows(
+    df_full: pd.DataFrame,
+    df_clean: pd.DataFrame,
+    keys=["Patient", "segment_ID"]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Find uncommon rows between df_full and df_clean (row-wise).
+
+    Args:
+        df_full : DataFrame
+            Original full dataset.
+        df_clean : DataFrame
+            Cleaned dataset (subset of df_full).
+
+    Returns:
+        uncommon : DataFrame
+            Rows in df_full that are not present in df_clean.
+    """
+    # Find uncommon rows (row-wise comparison)
+    merged = df_full.merge(df_clean, how="left", indicator=True)
+    uncommon = merged.loc[merged["_merge"] == "left_only"].drop(columns="_merge")
+
+    return uncommon
+
+def align_segment_ids(df_ref: pd.DataFrame, df_to_update: pd.DataFrame,
+                      seg_col: str = "segment_ID") -> pd.DataFrame:
+    """
+    Align segment_IDs in df_to_update with df_ref by comparing all other columns.
+    
+    Parameters
+    ----------
+    df_ref : DataFrame
+        Reference dataframe with the correct segment_IDs.
+    df_to_update : DataFrame
+        DataFrame whose segment_IDs should be updated.
+    seg_col : str
+        Column name for segment identifier.
+    
+    Returns
+    -------
+    df_aligned : DataFrame
+        Copy of df_to_update with segment_IDs updated to match df_ref
+        wherever all other columns match.
+    """
+    # Columns to match on (everything except seg_col)
+    match_cols = [c for c in df_ref.columns if c not in [seg_col]]
+    
+    # Merge on match_cols, but bring in seg_col from df_ref
+    merged = df_to_update.merge(
+        df_ref[[*match_cols, seg_col]],
+        on=match_cols,
+        how="left",
+        suffixes=("", "_ref")
+    )
+    
+    # Replace segment_ID in df_to_update with the aligned one
+    df_aligned = df_to_update.copy()
+    df_aligned[seg_col] = merged[f"{seg_col}_ref"].values
+    
+    return df_aligned
+
+def drop_rows_by_keys(labels_df: pd.DataFrame,
+                        df_to_drop: pd.DataFrame,
+                        keys: list[str]) -> pd.DataFrame:
+    """
+    Drop rows from labels_df whose (Patient, segment_ID) pairs appear in uncommon_df.
+    
+    Parameters
+    ----------
+    labels_df : DataFrame
+        Labels DataFrame that should be cleaned.
+    df_to_drop : DataFrame
+        DataFrame containing rows to exclude (with Patient + segment_ID keys).
+    keys : list of str
+        Column names to match on (e.g., ["Patient", "segment_ID"]).
+    
+    Returns
+    -------
+    cleaned_labels : DataFrame
+        A copy of labels_df with uncommon rows removed.
+    """
+    # Build set of key tuples to drop
+    keys_to_drop = set(map(tuple, df_to_drop[keys].to_numpy()))
+    
+    # Keep only rows not in keys_to_drop
+    mask = [tuple(row) not in keys_to_drop for row in labels_df[keys].to_numpy()]
+    cleaned_labels = labels_df[mask].reset_index(drop=True)
+    
+    return cleaned_labels

@@ -4,3 +4,4 @@ local_paths.py
 Scripts/bp_lgbm/data_features/
 CV_results_group
 configs
+mi_results

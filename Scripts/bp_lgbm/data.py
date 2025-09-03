@@ -133,8 +133,8 @@ def load_patient_dataset(
                         f"Please specify dataset_type explicitly."
                     )
                 ds_name = keys[0]
-                
-            ds_name = dataset_type
+            else:    
+                ds_name = dataset_type
 
             if ds_name not in group:
                 print(f"⚠️ Skipping {patient_id}, dataset {ds_name} not found")
@@ -157,7 +157,7 @@ def load_patient_dataset(
                 if "features" in ds.attrs:
                     features = ds.attrs["features"]
                     if len(features) == arr.shape[1]:
-                        cols = [str(f) for f in features]
+                        cols = [f.decode("utf-8") if isinstance(f, bytes) else str(f) for f in features]
                     else:
                         print(f"⚠️ Patient {patient_id}, 'features' length mismatch "
                               f"(attr={len(features)}, data={arr.shape[1]}). Using default.")

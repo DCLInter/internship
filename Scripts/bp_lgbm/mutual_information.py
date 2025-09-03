@@ -96,26 +96,32 @@ def compute_mi_info_fraction(X, y, k=5, verbose=True):
     return results
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def compute_mi_summary(X, y, feature_names=None,
-                       target_name="target", k=5, save_path=None):
+def compute_mi_summary(
+    X: pd.DataFrame,
+    y: pd.DataFrame | pd.Series,
+    feature_names: list[str] | None = None,
+    target_name: str = "target",
+    k: int = 5,
+    save_path: str | Path | None = None,
+) -> pd.DataFrame:
     """
-    Wrapper that computes MI, entropy, Info-Fraction, and runtime for each feature
+    Compute MI, entropy, Info-Fraction, and runtime for each feature
     individually and for the full feature set, using an existing
     compute_mi_info_fraction() function.
 
     Parameters
     ----------
-    X : pandas.DataFrame or np.ndarray
-        Input features.
+    X : pd.DataFrame
+        Feature matrix (samples x features).
     
-    y : array-like of shape (n_samples,)
-        Continuous target variable.
+    y : pd.Series or pd.DataFrame
+        Target variable(s). If DataFrame, `target_name` must be a column.
     
     feature_names : list of str, optional
-        Names of the features. If None, use DataFrame columns (if available) or numeric indices.
+        Names of the features. If None, use DataFrame columns.
     
     target_name : str, optional (default="target")
-        Name of the target variable.
+        Name of the target variable to use (if y is DataFrame).
     
     k : int, optional (default=5)
         Number of nearest neighbors for the MI estimator.
@@ -125,25 +131,33 @@ def compute_mi_summary(X, y, feature_names=None,
 
     Returns
     -------
-    results_df : pandas.DataFrame
+    results_df : pd.DataFrame
     """
-    # Handle feature names
+    # --- validate input
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError("X must be a pandas DataFrame")
+
+    if isinstance(y, pd.DataFrame):
+        if target_name not in y.columns:
+            raise ValueError(f"Target column '{target_name}' not found in y DataFrame")
+        y_vec = y[target_name].to_numpy().ravel()
+    else:
+        y_vec = y.to_numpy().ravel()
+
+    # --- feature names
     if feature_names is None:
-        if isinstance(X, pd.DataFrame):
-            feature_names = X.columns.tolist()
-        else:
-            feature_names = [f"f{i}" for i in range(X.shape[1])]
+        feature_names = X.columns.tolist()
 
     records = []
 
-    # Per-feature MI
+    # --- per-feature MI
     for i, fname in enumerate(feature_names):
-        if isinstance(X, pd.DataFrame):
-            Xi = X.iloc[:, i].to_numpy().reshape(-1, 1)
-        else:  # numpy array
-            Xi = X[:, i].reshape(-1, 1)
-
-        res = compute_mi_info_fraction(Xi, y, k=k, verbose=True)
+        Xi = X.iloc[:, i].to_numpy().reshape(-1, 1)
+        if len(Xi) != len(y_vec):
+            raise ValueError(
+                f"Length mismatch for feature '{fname}': X has {len(Xi)}, y has {len(y_vec)}"
+            )
+        res = compute_mi_info_fraction(Xi, y_vec, k=k, verbose=True)
         records.append({
             "Target": target_name,
             "Feature": fname,
@@ -153,13 +167,8 @@ def compute_mi_summary(X, y, feature_names=None,
             "Runtime": res["Runtime"]
         })
 
-    # Collective MI (all features)
-    if isinstance(X, pd.DataFrame):
-        X_all = X.to_numpy()
-    else:
-        X_all = X
-
-    res_all = compute_mi_info_fraction(X_all, y, k=k, verbose=True)
+    # --- collective MI
+    res_all = compute_mi_info_fraction(X.to_numpy(), y_vec, k=k, verbose=True)
     records.append({
         "Target": target_name,
         "Feature": "ALL_FEATURES",
@@ -171,7 +180,7 @@ def compute_mi_summary(X, y, feature_names=None,
 
     results_df = pd.DataFrame(records)
 
-    # Optional save
+    # --- optional save
     if save_path is not None:
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)

@@ -68,7 +68,7 @@ def run_grid_search(
             scoring=scoring,
             cv=cv_split,
             n_jobs=n_jobs,
-            refit=True,   # refit best model on all training data
+            refit=False,   # refit best model on all training data
             verbose=verbose,
             return_train_score=True,
         )
