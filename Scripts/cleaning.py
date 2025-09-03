@@ -11,9 +11,9 @@ class Cleaner:
         with h5py.File(datapath, 'r') as f:
             for patient in f.keys():
                 grp = f[patient]
-                data = grp["Metrics"][1:]
+                data = grp["Metrics"][:]
                 columns = [c.decode() for c in grp.attrs["metrics"]]
-                index = grp["Metrics"][0]
+                index = grp["Metrics"][:].T[-1]
                 self.ids[patient] = index
                 self.data[patient] = pd.DataFrame(data, columns=columns, index=index)
             self.metrics = columns
@@ -97,8 +97,10 @@ class Cleaner:
                         grp.attrs[attrs] = np.array(value,dtype=dt)
                     else:
                         grp.attrs[attrs] = value
+        print("File saved")
     
     def csvReport(self, filename: str):
+        print("Generating csv report in: ",filename)
         metrics = ["signals","age","gender","weight [kg]","height [m]","BMI [kg/m^2]","checkHR","checkSP","numberProperFiducials","std_fp","numPPG","numD1","numD2","numD3","combinedScore","std_s","report","eliminate"]
         metrics_data = self.data
         atributes = self.demo_info
@@ -146,4 +148,5 @@ class Cleaner:
             report_dfcsv.loc[patient] = [numSignals,age,gender,weight,height,bmi,hr,sp,f,stdFD,f0,f1,f2,f3,sc,stdS,report,numRemove]
         
         report_dfcsv.to_csv(filename)
+        print("File saved")
 
