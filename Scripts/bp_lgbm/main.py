@@ -26,16 +26,16 @@ if __name__ == "__main__":
     # Paths
     #==========================================================
     data_path = local_paths.DATA_DIR /"features_cleaned.h5"
-    labels_path = local_paths.LABELS_DIR / "BP_values.h5"
+    labels_path = local_paths.DATA_DIR / "BP_values.h5"
     data_messy_path = local_paths.DATA_DIR /"features_original.h5"
 
     # =========================================================
     # Load Data
     #==========================================================
-    df_features_mean = load_patient_dataset(data_path, dataset_type="mean")
+    #df_features_mean = load_patient_dataset(data_path, dataset_type="mean")
     df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
     labels_original_df = load_patient_dataset(labels_path, column_names=["SBP", "DBP", "MAP"])
-    metadata_clean_df = load_group_attributes(data_path)
+    #metadata_clean_df = load_group_attributes(data_path)
     metadata_original_df = load_group_attributes(data_messy_path)
 
     # =========================================================

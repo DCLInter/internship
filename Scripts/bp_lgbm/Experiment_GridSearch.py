@@ -20,7 +20,7 @@ import preprocessing
 import gs
 from pathlib import Path
 from data import load_patient_dataset, load_group_attributes
-from config import ExperimentConfig, lightGBM_default_params, lightGBM_small_grid_3target, save_config, lightGBM_small_grid
+from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_ultralean_grid_3target
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.pipeline import Pipeline
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     # build the model
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
-                           experiment_name="Grid_Search_3Targets_top5_subjects",
+                           experiment_name="Grid_Search_3Targets",
                            verbose = -1,
                            model_params=lightGBM_default_params)
     lgbm = build_lgbm(cfg)
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_small_grid,
+                                            param_grid=lightGBM_ultralean_grid_3target,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
