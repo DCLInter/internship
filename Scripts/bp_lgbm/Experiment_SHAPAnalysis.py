@@ -49,9 +49,7 @@ if __name__ == "__main__":
     labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["SBP", "DBP", "MAP", "segment_ID"])
 
     df_feat_cleaned_mean = load_patient_dataset(data_path_cleaned, dataset_type="mean")
-    labels_cleaned_df = load_patient_dataset(file_path=labels_path, column_names=["SBP", "DBP", "MAP", "segment_ID"])
     print(df_feat_cleaned_mean.head())
-    print(labels_cleaned_df.head())
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
@@ -112,10 +110,51 @@ if __name__ == "__main__":
     """
     
     # =========================================================
+    # Initialize model
+    #==========================================================
+    # build the model
+    cfg = ExperimentConfig(n_splits=5, # it is not used in shap
+                           random_state=42, 
+                           experiment_name="ShapAnalysis",
+                           verbose = -1,
+                           model_params=lightGBM_best_guess_1)
+    lgbm = build_lgbm(cfg)
+
+    # build the pipeline
+    pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("model", lgbm)
+    ])
+
+    # =========================================================
     # Shapley Analysis
     #==========================================================
-    """
+    #~~~~~~~~~~ Testing pipeline only ~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    # Count signals per patient
+    counts = XY_df_original.groupby("Patient").size()
+
+    # Get top 5 patients
+    top5_patients = counts.nlargest(5).index   # patient IDs of top 5
+
+    # If you want to extract all their rows:
+    top5_XY_df = XY_df_original[XY_df_original["Patient"].isin(top5_patients)]
+    print(top5_XY_df.info())
+    X_train, Y_train = preprocessing.split_XY(top5_XY_df,
+                                                    target_cols= ["SBP", "DBP", "MAP"],
+                                                    id_cols= ["Patient", "segment_ID"]
+                                                    )
+    #Dropping strg columns
+    id_cols = ["Patient", "segment_ID"]
+    targets = ["SBP", "DBP", "MAP"]
+    X_train = X_train.drop(columns=id_cols)
+    Y_train = Y_train["SBP"]   # or whatever target you want
+
     # I need to refit a model (this time over the full train dataset)
-    final_lgbm = pipeline.fit(X_train, Y_train)
-    avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(final_lgbm, X_train, Y_train, n_iter=50)
-    """
+    avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(pipeline, 
+                                                                                                                   X_train, 
+                                                                                                                   Y_train,
+                                                                                                                   n_iter=50, 
+                                                                                                                   save_path=Path(f"shap_results/original/{targets[0]}"))
+    print("end")
+    

@@ -8,6 +8,8 @@ import shap
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import pandas as pd
+import os
 from pathlib import Path
 from sklearn.base import clone
 
@@ -93,7 +95,7 @@ def rank_features_from_shap(shap_values, feature_names):
     ranking = np.argsort(-mean_abs_shap)  # descending order
     return ranking, mean_abs_shap
 
-def shap_rank_stability(
+def shap_rank_stability( # THIS FUNCTION NEEDS REFACTORING
     pipeline, 
     X, 
     y, 
@@ -101,7 +103,8 @@ def shap_rank_stability(
     n_iter: int = 50, 
     tol: float = 1.0, 
     random_state: int = 42,
-    verbose: bool = True
+    verbose: bool = True,
+    save_path: str = None  # NEW: where to save results (directory or file prefix)
 ):
     """
     Evaluate the stability of SHAP feature importance rankings and absolute values 
@@ -137,6 +140,9 @@ def shap_rank_stability(
     
     verbose : bool, optional (default=True)
         Print progress and stability information.
+    save_path : str, optional
+        If provided, saves results to CSV/NPZ files. 
+        Use as a prefix (e.g., "results/shap_sbp") and function will append suffixes.
 
     Returns
     -------
@@ -158,8 +164,6 @@ def shap_rank_stability(
     feature_names : list of str
         Feature names corresponding to columns of X.
     """
-    import numpy as np
-    from sklearn.base import clone
 
     feature_names = list(X.columns)
     n_features = X.shape[1]
@@ -174,6 +178,8 @@ def shap_rank_stability(
     for i in range(n_iter):
         if verbose:
             print(f"[Iteration {i+1}/{n_iter}]")
+
+        iter_start = time.time()
 
         # Clone and fit pipeline
         pipe = clone(pipeline)
@@ -214,7 +220,11 @@ def shap_rank_stability(
         prev_ranks = rank_matrix[i].copy()
         effective_iters = i + 1
 
-    # Truncate matrices to effective iterations
+        # Time tracker
+        elapsed = time.time() - iter_start
+        print(f"  Iteration time: {elapsed:.2f} seconds")
+
+    # Truncate matrices
     rank_matrix = rank_matrix[:effective_iters]
     abs_shap_matrix = abs_shap_matrix[:effective_iters]
     rank_diff_matrix = rank_diff_matrix[:effective_iters - 1]
@@ -223,7 +233,28 @@ def shap_rank_stability(
     avg_rank = rank_matrix.mean(axis=0)
     avg_abs_shap = abs_shap_matrix.mean(axis=0)
 
+    # === NEW: Save if requested ===
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        # Save as tidy DataFrame for easy inspection
+        df_summary = pd.DataFrame({
+            "feature": feature_names,
+            "avg_rank": avg_rank,
+            "avg_abs_shap": avg_abs_shap
+        })
+        df_summary.to_csv(f"{save_path}_summary.csv", index=False)
+
+        # Full matrices as CSV
+        pd.DataFrame(rank_matrix, columns=feature_names).to_csv(f"{save_path}_rank_matrix.csv", index=False)
+        pd.DataFrame(abs_shap_matrix, columns=feature_names).to_csv(f"{save_path}_abs_shap_matrix.csv", index=False)
+        pd.DataFrame(rank_diff_matrix, columns=feature_names).to_csv(f"{save_path}_rank_diff_matrix.csv", index=False)
+
+        if verbose:
+            print(f"Results saved to: {os.path.dirname(save_path)}")
+
     return avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names
+
 
 # ----------------------------
 # Visualization

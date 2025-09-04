@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    data_path = local_paths.DATA_DIR /"features_cleaned.h5"
+    data_path_cleaned = local_paths.DATA_DIR /"features_patients_clean.h5"
     labels_path = local_paths.LABELS_DIR / "BP_values.h5"
     data_messy_path = local_paths.DATA_DIR /"features_patients.h5"
 
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
     labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["SBP", "DBP", "MAP", "segment_ID"])
     metadata_original_df = load_group_attributes(data_messy_path)
+    df_feat_cleaned_mean = load_patient_dataset(data_path_cleaned, dataset_type="mean")
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
@@ -62,6 +63,11 @@ if __name__ == "__main__":
 
     # Fill Y NaNs
     Y_df_original_feat = preprocessing.fill_missing_bp(labels_original_df)
+
+    # =========================================================
+    # Solving Macheetazos
+    #==========================================================
+    uncommon = preprocessing.find_uncommon_rows(X_df_original_feat, df_feat_cleaned_mean)
 
     # =========================================================
     # X and Y dfs merging
@@ -90,9 +96,8 @@ if __name__ == "__main__":
     print("Keys in Y but not in X:", missing_in_X)
     """
 
-    XY_df = preprocessing.merge_XY(X_df_original_feat, Y_df_original_feat) # When possible, add the parmeter "on: Segements_ID"
-    print(XY_df.head())
-    print(XY_df.info())
+    XY_df_original = preprocessing.merge_XY(X_df_original_feat, Y_df_original_feat) # When possible, add the parmeter "on: Segements_ID"
+    XY_df_original = preprocessing.reset_segment_ids(XY_df_original, patient_col="Patient", segment_col="segment_ID")
 
      #~~~~~~~~~~ Testing pipeline only ~~~~~~~~~~~~~~~~~~~~~~~~
     """
@@ -106,43 +111,36 @@ if __name__ == "__main__":
     top5_XY_df = XY_df[XY_df["Patient"].isin(top5_patients)]
     print(top5_XY_df.info())
     """
+
+    
+
     # =========================================================
     # Splitting into X and Y
     #==========================================================
-    X_df_train, Y_df_train = preprocessing.split_XY(XY_df,
+    X_df_t_orig, Y_df_t_orig = preprocessing.split_XY(XY_df_original,
                                                     target_cols= ["SBP", "DBP", "MAP"],
-                                                    id_cols= ["Patient"]
+                                                    id_cols= ["Patient", "segment_ID"]
                                                     )
-    
     # =========================================================
-    # Initialize model
+    # Solving Machetazos 2.0
     #==========================================================
-    # drop ID columns before training
-    id_cols = ["Patient", "segment_ID"]
-    targets = ["SBP", "DBP", "MAP"]
-    groups = X_df_train["Patient"]
-    X_train = X_df_train.drop(columns=id_cols)
-    Y_train = Y_df_train[targets]   # or whatever target you want
+    X_df_t_clean = preprocessing.align_segment_ids(X_df_t_orig, df_feat_cleaned_mean, seg_col="segment_ID")
+    uncommon = preprocessing.align_segment_ids(X_df_t_orig, uncommon, seg_col="segment_ID")
 
-    # build the model
-    cfg = ExperimentConfig(n_splits=5,
-                           random_state=42, 
-                           experiment_name="Shapley_test",
-                           verbose = -1,
-                           model_params=lightGBM_best_guess_1)
-    lgbm = build_lgbm(cfg)
-
-    # build the pipeline
-    pipeline = Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", lgbm)
-    ])
+    # Dropping the labels
+    Y_df_t_clean = preprocessing.drop_rows_by_keys(Y_df_t_orig, uncommon, keys = ["Patient", "segment_ID"])
 
     # =========================================================
     # Mutual Information Analysis
     #==========================================================
-    for target in Y_train.columns:
+    X_df_t_clean = X_df_t_clean.drop(columns=["Patient", "segment_ID"])
+    Y_df_t_clean = Y_df_t_clean.drop(columns=["Patient", "segment_ID"])
+    
+    
+    targets = Y_df_t_clean.columns
+    for target in targets:
         print(f"Analysing - {target} - target")
-        mi_results = mi.compute_mi_summary(X_train, Y_train, X_train.columns, target, k = 5, save_path=Path(f"mi_results/{target}.csv"))
+        mi_results = mi.compute_mi_summary(X_df_t_clean, Y_df_t_clean, X_df_t_clean.columns, target, k = 5, save_path=Path(f"mi_results/cleaned/{target}.csv"))
+        
 
     

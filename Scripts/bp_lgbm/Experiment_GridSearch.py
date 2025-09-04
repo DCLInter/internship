@@ -20,7 +20,7 @@ import preprocessing
 import gs
 from pathlib import Path
 from data import load_patient_dataset, load_group_attributes
-from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_baseline_grid_3target
+from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_ultralean_grid_3target
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.pipeline import Pipeline
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_baseline_grid_3target,
+                                            param_grid=lightGBM_ultralean_grid_3target,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,

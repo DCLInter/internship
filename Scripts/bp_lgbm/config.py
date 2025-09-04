@@ -184,6 +184,14 @@ lightGBM_baseline_grid_3target = {
     "model__estimator__bagging_freq": [1],
 }
 
+lightGBM_ultralean_grid_3target = {
+    "model__estimator__num_leaves": [31, 63],
+    "model__estimator__max_depth": [-1, 10],
+    "model__estimator__learning_rate": [0.05, 0.1],
+    "model__estimator__n_estimators": [500, 1000],
+}
+
+
 # Small grid: quick runs
 lightGBM_small_grid = {
     "model__estimator__num_leaves": [31, 63],
