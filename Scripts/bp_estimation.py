@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from other_functions import bland_altman_plot
 
 class BPModel_LightGBM:
-    def __init__(self, data: dict, data_target: dict, target_label: list, features_list: list, random_state: int, default_model: bool = True, limit_data: int = 10000):
+    def __init__(self, data: dict, data_target: dict, target_label: list, features_list: list, random_state: int, default_model: bool = True, limit_data: int = 0):
         self.random_state = random_state
         dataframe_X = pd.DataFrame(columns=features_list)
         for p in data.keys():

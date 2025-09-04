@@ -6,7 +6,7 @@ from bp_estimation import BPModel_LightGBM
 
 # This script demonstrates how to use the BPModel_LightGBM class for blood pressure estimation.
 data_path = 'features_patients_clean.h5'
-data_path_target = 'BP_values.h5'
+data_path_target = 'BP_values_clean.h5'
 data = {}
 data_target = {}
 target_label = ["SBP","DBP","MAP"]
