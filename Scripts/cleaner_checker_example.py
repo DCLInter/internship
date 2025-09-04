@@ -12,9 +12,9 @@ For the cleaning alone note that if you dont have "signal ids" it doesn't matter
 -  just know that the "signal ids" will be the first value of the signal 
 '''
 
-path_fiducials = "D:/Documentos/GitHub/internship/features_patients.h5"
+path_fiducials = "D:/U/Practicas_City_University_of_London/Data/features_patients.h5"
 path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
-filename_report = "metrics.h5"
+filename_report = "D:/U/Practicas_City_University_of_London/Data/metrics.h5"
 filename_cleanData = "features_patients_clean.h5"
 filename_csvReport = "general_report.csv"
 
@@ -56,4 +56,4 @@ dictFlags = c.detect()
 ### You can clean the data contaning the features or the original data with just the signals
 clean_data = c.clean(path_fiducials) # path_originalData
 c.csvReport(filename_csvReport)
-c.saveh5(filename_cleanData)
+c.saveh5(filename_cleanData) # filename_cleanData
