@@ -18,7 +18,7 @@ from lib_changes import biomarkers2 as BM2 ##Modified
 from other_functions_PPG import Others ### Class with some other functions
 
 class Feature_Extraction():
-    def __init__(self, h5name: str, csvname: str, data_ext: dict = None, data_path: str = ""):
+    def __init__(self, h5name: str = "", csvname: str = "", data_ext: dict = None, data_path: str = ""):
         
         self.data = {}
         self.segment_ids = {}
@@ -94,10 +94,11 @@ class Feature_Extraction():
 
         return X, Med
 
-    def feature_extraction(self):
+    def feature_extraction(self, save: bool = True):
         data = self.data
         segment_ids = self.segment_ids
         demo_info = self.demo_info
+
         samples = self.samples
         signal_dict = self.signal_dict
         mean = self.mean
@@ -205,7 +206,7 @@ class Feature_Extraction():
                 
                 ft_pt_mean = pd.concat([ft_pt_mean,x])
                 ft_pt_median = pd.concat([ft_pt_median,y])
-            
+                
             fp_pt = pd.DataFrame(fp_pt_list)
             fp_pt.insert(0,"segment_ID",segment_ids[i])
             signal_dict[i] = fp_pt.T
@@ -217,8 +218,9 @@ class Feature_Extraction():
             median[i] = ft_pt_median.T
 
         #### If you want to save the data when it changes between patients just move it inside the loop, it will work
-        print("Saving in: ",self.filename_save)
-        self.save_h5(signal_dict,mean,median,fiducials_names=fp_col, filename=self.filename_save)
+        if save:
+            print("Saving in: ",self.filename_save)
+            self.save_h5(signal_dict,mean,median,fiducials_names=fp_col, filename=self.filename_save)
         
         # Saving the signals that could not be processed due to empty fiducials
         df_empty = pd.DataFrame({
@@ -228,6 +230,7 @@ class Feature_Extraction():
         'signals_total': [len(data[v]) for v in list(empty.keys())],
         '%': [(len(s)/len(data[p]))*100 for p,s in empty.items()]
         })
-        df_empty.to_csv(self.filename_csv,index=False)
+        if save:
+            df_empty.to_csv(self.filename_csv,index=False)
 
         return mean,median,df_empty,signal_dict

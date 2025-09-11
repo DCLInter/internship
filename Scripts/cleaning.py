@@ -44,7 +44,7 @@ class Cleaner:
             for group_name in f:
                 group = f[group_name]
                 dataset_names = list(group.keys())
-                original_ids[group_name] = group[dataset_names[0]][1]
+                original_ids[group_name] = group[dataset_names[0]][0]
                 self.original_data[group_name] = {}
                 data[group_name] = {}
                 self.attributes[group_name] = {}
@@ -72,7 +72,6 @@ class Cleaner:
             target = np.isin(ids,sig_rem)
             for dst in clean_data[patient].keys():
                 clean_data[patient][dst] = clean_data[patient][dst].drop(clean_data[patient][dst].index[target])
-
         self.clean_data = clean_data
 
         return clean_data

@@ -12,30 +12,30 @@ import matplotlib.pyplot as plt
 from other_functions import bland_altman_plot
 
 class BPModel_LightGBM:
-    def __init__(self, data: dict, data_target: dict, target_label: list, features_list: list, default_model: bool = True, limit_data: int = 10000):
-
+    def __init__(self, data: dict, data_target: dict, target_label: list, features_list: list, random_state: int, default_model: bool = True, limit_data: int = 0):
+        self.random_state = random_state
         dataframe_X = pd.DataFrame(columns=features_list)
         for p in data.keys():
             p_array = data[p]["mean"].T
-            p_array = p_array[:len(p_array)//2]
             col_p = np.full(len(p_array), p, dtype=object)
             p_df = pd.DataFrame(p_array,columns=features_list)
             p_df["patient"] = col_p
             dataframe_X = pd.concat([dataframe_X,p_df],ignore_index=True)
         groups = dataframe_X["patient"].values
-        dataframe_X = dataframe_X.drop(columns="patient")
+        dataframe_X = dataframe_X.drop(columns=["patient","segment_ID"])
 
         df_target = pd.DataFrame(columns= target_label)
         for p in data.keys():
             p_array = data_target[p]["Bp_values"].T
-            target_label = target_label.insert(-1,"id")
-            p_df = pd.DataFrame(p_array,columns = target_label)
+            p_df = pd.DataFrame(p_array,columns = ["id"]+target_label)
             df_target = pd.concat([df_target,p_df],ignore_index=True)
         df_target = df_target.drop(columns="id")
-
-        dataframe_X = dataframe_X[:limit_data]
-        groups = groups[:limit_data]
-        df_target = df_target[:limit_data]
+        
+        # Limiting the data for faster testing
+        if limit_data != 0 and limit_data < len(dataframe_X):
+            dataframe_X = dataframe_X[:limit_data]
+            groups = groups[:limit_data]
+            df_target = df_target[:limit_data]
 
         self.X = dataframe_X
         self.target = df_target
@@ -44,15 +44,17 @@ class BPModel_LightGBM:
         self.model_setup()
         self.split(valid_set=True)
         if default_model:
-            self.error_test, self.error_valid = self.prediction(valid_set=True, shap=True)
+            self.error_test, self.error_valid = self.prediction(valid_set=True, shap=True, limit_shap=1000)
 
         # Splitting the data patient wise to avoid data leakage
     def split(self, test_size: int = 0.2, n_split: int = 1, valid_set: bool = False):
+        print("Splitting the data")
         dataframe_X = self.X
         df_target = self.target
         groups = self.groups
+        rnd_state = self.random_state
 
-        gss = GroupShuffleSplit(n_splits=n_split, test_size=test_size, random_state=42)
+        gss = GroupShuffleSplit(n_splits=n_split, test_size=test_size, random_state = rnd_state)
         train_idx, test_idx = next(gss.split(dataframe_X, df_target, groups=groups))
         X_train, X_test = dataframe_X.iloc[train_idx], dataframe_X.iloc[test_idx]
         y_train, y_test = df_target.iloc[train_idx], df_target.iloc[test_idx]
@@ -73,7 +75,7 @@ class BPModel_LightGBM:
         self.y_test = y_test
 
         if valid_set:
-            a, X_valid, b, y_valid = train_test_split(X_train,y_train,test_size=0.2, random_state=42)
+            a, X_valid, b, y_valid = train_test_split(X_train,y_train,test_size=0.2, random_state= rnd_state)
             X_valid = imputer_X.fit_transform(X_valid)
             y_valid = imputer_y.fit_transform(y_valid)
             self.X_valid = X_valid
@@ -83,9 +85,10 @@ class BPModel_LightGBM:
         return X_train, y_train, X_test, y_test
     
     def model_setup(self, parameters: dict = None):
-
+        rnd_st = self.random_state
+        print("Setting up the model")
         default_params = {
-        "random_state": 42,
+        "random_state": rnd_st,
         "n_estimators": 800,
         "learning_rate": 0.05,
         "max_depth": -1,
@@ -102,8 +105,8 @@ class BPModel_LightGBM:
         
         return multi_model
     
-    def prediction(self, valid_set: bool = False, shap: bool = False):
-
+    def prediction(self, valid_set: bool = False, shap: bool = False, limit_shap: int = 1000):
+        print("Making predictions")
         multi_model = self.model
         X_train, y_train, X_test, y_test, X_valid, y_valid = self.X_train, self.y_train, self.X_test, self.y_test, self.X_valid, self.y_valid
 
@@ -111,13 +114,15 @@ class BPModel_LightGBM:
         multi_model.fit(X_train, y_train)
         # Testing
         predictions = multi_model.predict(X_test)
+        print("Results on the test set:")
         df_pred_error = self.results(predictions, y_test, self.target_label)
 
         if shap:
-            self.SHAPvalues(self.target_label)
+            self.SHAPvalues(self.target_label, limit=limit_shap)
         
         # Validation
         if valid_set:
+            print("Results on the validation set:")
             predictions_valid = multi_model.predict(X_valid)
             df_valid_error = self.results(predictions_valid, y_valid, self.target_label)
             return df_pred_error, df_valid_error
@@ -132,10 +137,11 @@ class BPModel_LightGBM:
         X_train = self.X_train
         y_train = self.y_train
         train_idx = self.train_idx
+        random_state = self.random_state
 
         # Grid Search (tuning fot the best hyperparameters for LGBM model)
         # Note: Since MultiOutputRegressor wraps the estimator, prefix parameters with estimator__ in PARAM_GRID.
-        cv = KFold(n_splits= n_splits, shuffle=True, random_state=42)
+        cv = KFold(n_splits= n_splits, shuffle=True, random_state = random_state)
         grid_search = GridSearchCV(
             estimator= model,
             param_grid= param_grid,
@@ -184,7 +190,7 @@ class BPModel_LightGBM:
         
         return df_pred_error
 
-    def SHAPvalues(self, target_labels: list):
+    def SHAPvalues(self, target_labels: list, limit: int = 1000):
         print("Processing SHAP values:")
         X = self.X
         multi_model = self.model
@@ -193,9 +199,9 @@ class BPModel_LightGBM:
             model_i = multi_model.estimators_[i]
             # Use TreeExplainer (fast & efficient for LightGBM)
             explainer = shap.Explainer(model_i)
-            shap_values = explainer(X[:1000])
+            shap_values = explainer(X[:limit])
             # Summary plot
-            shap.summary_plot(shap_values, X[:1000], feature_names=X.columns, show = False)
+            shap.summary_plot(shap_values, X[:limit], feature_names=X.columns, show = False)
             plt.title(f"SHAP Plot for {target_labels[i]}", fontsize=14)
             plt.savefig(f"{target_labels[i]}_shap_summary_plot.png", dpi=300, bbox_inches='tight')
             plt.close()

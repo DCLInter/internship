@@ -22,7 +22,7 @@ def plot(signal,peaks,valleys,show: bool =False, delay: int = 1):
 
 data = {}
 segment_ids = {}
-data_path = "D:/U/Practicas_City_University_of_London/One_drive/Data/patient_data.h5"
+data_path = "D:/U/Practicas_City_University_of_London/Data/patient_data.h5"
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
         group = f[group_name]
@@ -114,8 +114,8 @@ for patient, data_df in data.items():
             DBP = np.average(valleys_values)
             
         MAP = np.mean(signal)
-        
-        list_bp.append([SBP,DBP,MAP])
+        id = segment_ids[patient][sig]
+        list_bp.append([id,SBP,DBP,MAP])
 
         show = False
         if flag[0] == True:
@@ -123,8 +123,7 @@ for patient, data_df in data.items():
             print("SBP, DBP, MAP: ",SBP,DBP,MAP)
         plot(signal,peaks_clean,valleys_clean,show=show,delay=10)
 
-    df_bp = pd.DataFrame(list_bp, columns=["SBP","DBP","MAP"])
-    df_bp["signal_id"] = segment_ids[patient][0:len(df_bp)]
+    df_bp = pd.DataFrame(list_bp, columns=["ID","SBP","DBP","MAP"])
     bp_values[patient] = df_bp
     
 print("Fallo completamente: ", a)
