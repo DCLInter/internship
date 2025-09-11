@@ -12,13 +12,14 @@ Recommendations for evaluating photoplethysmography-based algorithms for blood p
 Commun Med 4, 140 (2024). https://doi.org/10.1038/s43856-024-00555-2
 """
 
-# Metrics: MAE (+SD), ME (+SD), RMSE, MSE, R2, absolute errors, Bland–Altman plot (7 metrics)
+# Metrics: MAE (+SD), ME (+SD) - or SDE, RMSE, MSE, R2, absolute errors, Bland–Altman plot (7 metrics)
 
 
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from typing import Dict, Tuple
+from pathlib import Path
 
 # ----------------------------
 # Evaluation
@@ -57,11 +58,12 @@ def bland_altman_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "bland
         "plot_path": path,
     }
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray, path: str) -> Dict[str, float]:
     """
     Compute requested metrics:
     - MAE (+SD of |error|)
-    - ME (+SD of signed error)
+    - ME
+    - SDE (SD of ME)
     - RMSE, MSE
     - R2
     - Absolute errors (returned as array for further analysis)
@@ -74,20 +76,20 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     mae_sd = float(np.std(abs_errors, ddof=1))
 
     me = float(np.mean(errors))
-    me_sd = float(np.std(errors, ddof=1))
+    sde = float(np.std(errors, ddof=1))
 
     mse = mean_squared_error(y_true, y_pred)
     rmse = float(np.sqrt(mse))
 
     r2 = r2_score(y_true, y_pred)
 
-    ba_stats = bland_altman_plot(y_true, y_pred, path="bland_altman.png")
+    ba_stats = bland_altman_plot(y_true, y_pred, path=Path(path))
 
     metrics = {
         "MAE": float(mae),
         "MAE_SD": float(mae_sd),
         "ME": me,
-        "ME_SD": me_sd,
+        "SDE": sde,
         "MSE": float(mse),
         "RMSE": rmse,
         "R2": float(r2),

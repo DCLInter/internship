@@ -187,14 +187,7 @@ def load_group_attributes(
     return them as a DataFrame (one row per patient).
     Attribute names become column names.
     Adds an extra column 'Total_signals' based on dataset_for_count.
-    Adds extra column named BMI
-
-    Args:
-        file_path: Path to HDF5 file where each patient is a group
-        dataset_for_count: which dataset to use to compute total signals
-
-    Returns:
-        pd.DataFrame with patient attributes + total_signals
+    Adds extra column named BMI.
     """
     file_path = Path(file_path)
     records = []
@@ -208,17 +201,13 @@ def load_group_attributes(
             attrs["Patient"] = patient_id
 
             # --- count signals ---
-            if dataset_for_count == "segments":
-                ds_name = "segments"
-            else:
-                ds_name = f"{dataset_for_count}_{patient_id}"
-
-            if ds_name in group:
-                ds = group[ds_name]
-                # ds.shape = (features, samples) → signals = samples
-                total_signals = ds.shape[1]
-            else:
+            if dataset_for_count not in group:
+                print(f"⚠️ Skipping {patient_id}, dataset {dataset_for_count} not found")
                 total_signals = np.nan
+            else:
+                ds = group[dataset_for_count]
+                # ds.shape = (features, samples)
+                total_signals = ds.shape[1]
 
             attrs["Total_signals"] = total_signals
             records.append(attrs)
@@ -227,12 +216,16 @@ def load_group_attributes(
         raise RuntimeError(f"No group attributes found in {file_path}")
 
     df = pd.DataFrame(records)
-    # Create the BMI column
-    df['Height'] = df['Height']/100
-    df['BMI'] = (df['Weight']/df['Height']**2).round(2)
+
+    # Create the BMI column if Height/Weight exist
+    if "Height" in df and "Weight" in df:
+        df["Height"] = df["Height"] / 100  # cm → m
+        df["BMI"] = (df["Weight"] / df["Height"]**2).round(2)
+
     # Ensure patient column is first
     cols = ["Patient"] + [c for c in df.columns if c != "Patient"]
     return df[cols]
+
 
 def _stringify(val):
     """Convert HDF5 attribute to a JSON/pandas-friendly value."""

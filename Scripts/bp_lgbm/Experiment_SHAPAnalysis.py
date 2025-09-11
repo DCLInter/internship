@@ -27,7 +27,6 @@ from sklearn.metrics import mean_squared_error as mse
 from pathlib import Path
 from h5_inspector import inspect_file
 
-
 if __name__ == "__main__":
 
     # =========================================================
@@ -146,6 +145,7 @@ if __name__ == "__main__":
                                                     )
     #Dropping strg columns
     id_cols = ["Patient", "segment_ID"]
+    groups = X_train["Patient"]
     targets = ["SBP", "DBP", "MAP"]
     X_train = X_train.drop(columns=id_cols)
     Y_train = Y_train["SBP"]   # or whatever target you want
@@ -154,7 +154,8 @@ if __name__ == "__main__":
     avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(pipeline, 
                                                                                                                    X_train, 
                                                                                                                    Y_train,
+                                                                                                                   groups = groups, 
                                                                                                                    n_iter=50, 
-                                                                                                                   save_path=Path(f"shap_results/original/{targets[0]}"))
+                                                                                                                   save_path=Path(f"shap_results/test/{targets[0]}"))
     print("end")
     
