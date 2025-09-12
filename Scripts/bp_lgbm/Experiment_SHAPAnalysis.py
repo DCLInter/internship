@@ -45,10 +45,11 @@ if __name__ == "__main__":
     """
 
     df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
-    labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["SBP", "DBP", "MAP", "segment_ID"])
+    labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["segment_ID","SBP", "DBP", "MAP"])
 
     df_feat_cleaned_mean = load_patient_dataset(data_path_cleaned, dataset_type="mean")
     print(df_feat_cleaned_mean.head())
+    print(labels_original_df.head())
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
@@ -129,7 +130,7 @@ if __name__ == "__main__":
     # Shapley Analysis
     #==========================================================
     #~~~~~~~~~~ Testing pipeline only ~~~~~~~~~~~~~~~~~~~~~~~~
-    
+    """
     # Count signals per patient
     counts = XY_df_original.groupby("Patient").size()
 
@@ -143,12 +144,13 @@ if __name__ == "__main__":
                                                     target_cols= ["SBP", "DBP", "MAP"],
                                                     id_cols= ["Patient", "segment_ID"]
                                                     )
+    """
     #Dropping strg columns
     id_cols = ["Patient", "segment_ID"]
-    groups = X_train["Patient"]
+    groups = X_df_t_orig["Patient"]
     targets = ["SBP", "DBP", "MAP"]
-    X_train = X_train.drop(columns=id_cols)
-    Y_train = Y_train["SBP"]   # or whatever target you want
+    X_train = X_df_t_orig.drop(columns=id_cols)
+    Y_train = Y_df_t_orig["SBP"]   # or whatever target you want
 
     # I need to refit a model (this time over the full train dataset)
     avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(pipeline, 

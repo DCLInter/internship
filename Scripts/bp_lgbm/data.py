@@ -240,5 +240,78 @@ def _stringify(val):
         return arr.tolist()
     return val
 
+def load_PulseDB_sup_ds(
+    file_path: str | Path,
+    feature_names: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Load flat HDF5 dataset into a tidy DataFrame. This h5 files come from the preprocessing of the Vital DB supplementary material from the Pulse DB
+
+    Structure:
+└─ [G] /
+     ├─ [D] Age :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] BMI :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] DBP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] Gender :: shape=(57600, 1), dtype=object, no-filters, est=450.00 KB 
+     ├─ [D] Height :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] MAP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB   
+     ├─ [D] PPG_features :: shape=(28, 57600), dtype=float64, no-filters, est=12.30 MB
+     ├─ [D] SBP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] SF :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] Subject :: shape=(57600, 1), dtype=object, no-filters, est=450.00 KB
+     └─ [D] Weight :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+
+    Args
+    ----
+    file_path : str | Path
+        Path to the .h5 file
+    feature_names : list[str], optional
+        Names for the PPG features (length must match number of rows in PPG_features)
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with metadata + target columns + PPG feature columns
+    """
+    file_path = Path(file_path)
+    with h5py.File(file_path, "r") as f:
+        # Load scalars (all shape (N,1))
+        n_samples = f["Age"].shape[0]
+        data_dict = {
+            "Age": np.array(f["Age"]).reshape(-1),
+            "BMI": np.array(f["BMI"]).reshape(-1),
+            "DBP": np.array(f["DBP"]).reshape(-1),
+            "Gender": np.array(f["Gender"]).astype(str).reshape(-1),
+            "Height": np.array(f["Height"]).reshape(-1),
+            "MAP": np.array(f["MAP"]).reshape(-1),
+            "SBP": np.array(f["SBP"]).reshape(-1),
+            "SF": np.array(f["SF"]).reshape(-1),
+            "Subject": np.array(f["Subject"]).astype(str).reshape(-1),
+            "Weight": np.array(f["Weight"]).reshape(-1),
+        }
+
+        # Load and transpose PPG features (28, N) → (N, 28)
+        ppg_arr = np.array(f["PPG_features"]).T
+
+        # Assign names
+        if feature_names is None:
+            feature_names = [f"PPG_feat{i+1}" for i in range(ppg_arr.shape[1])]
+        elif len(feature_names) != ppg_arr.shape[1]:
+            raise ValueError(
+                f"feature_names length {len(feature_names)} != number of PPG features {ppg_arr.shape[1]}"
+            )
+
+        for i, name in enumerate(feature_names):
+            data_dict[name] = ppg_arr[:, i]
+
+    # Assemble DataFrame with desired order
+    df = pd.DataFrame(data_dict)
+
+    ordered_cols = [
+        "Subject", "Age", "Gender", "Height", "Weight",
+        "BMI", "SF", "SBP", "DBP", "MAP"
+    ] + feature_names
+
+    return df[ordered_cols]
 
 #====================================================================
