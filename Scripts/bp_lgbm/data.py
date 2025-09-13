@@ -187,14 +187,7 @@ def load_group_attributes(
     return them as a DataFrame (one row per patient).
     Attribute names become column names.
     Adds an extra column 'Total_signals' based on dataset_for_count.
-    Adds extra column named BMI
-
-    Args:
-        file_path: Path to HDF5 file where each patient is a group
-        dataset_for_count: which dataset to use to compute total signals
-
-    Returns:
-        pd.DataFrame with patient attributes + total_signals
+    Adds extra column named BMI.
     """
     file_path = Path(file_path)
     records = []
@@ -208,17 +201,13 @@ def load_group_attributes(
             attrs["Patient"] = patient_id
 
             # --- count signals ---
-            if dataset_for_count == "segments":
-                ds_name = "segments"
-            else:
-                ds_name = f"{dataset_for_count}_{patient_id}"
-
-            if ds_name in group:
-                ds = group[ds_name]
-                # ds.shape = (features, samples) → signals = samples
-                total_signals = ds.shape[1]
-            else:
+            if dataset_for_count not in group:
+                print(f"⚠️ Skipping {patient_id}, dataset {dataset_for_count} not found")
                 total_signals = np.nan
+            else:
+                ds = group[dataset_for_count]
+                # ds.shape = (features, samples)
+                total_signals = ds.shape[1]
 
             attrs["Total_signals"] = total_signals
             records.append(attrs)
@@ -227,12 +216,16 @@ def load_group_attributes(
         raise RuntimeError(f"No group attributes found in {file_path}")
 
     df = pd.DataFrame(records)
-    # Create the BMI column
-    df['Height'] = df['Height']/100
-    df['BMI'] = (df['Weight']/df['Height']**2).round(2)
+
+    # Create the BMI column if Height/Weight exist
+    if "Height" in df and "Weight" in df:
+        df["Height"] = df["Height"] / 100  # cm → m
+        df["BMI"] = (df["Weight"] / df["Height"]**2).round(2)
+
     # Ensure patient column is first
     cols = ["Patient"] + [c for c in df.columns if c != "Patient"]
     return df[cols]
+
 
 def _stringify(val):
     """Convert HDF5 attribute to a JSON/pandas-friendly value."""
@@ -247,5 +240,78 @@ def _stringify(val):
         return arr.tolist()
     return val
 
+def load_PulseDB_sup_ds(
+    file_path: str | Path,
+    feature_names: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Load flat HDF5 dataset into a tidy DataFrame. This h5 files come from the preprocessing of the Vital DB supplementary material from the Pulse DB
+
+    Structure:
+└─ [G] /
+     ├─ [D] Age :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] BMI :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] DBP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] Gender :: shape=(57600, 1), dtype=object, no-filters, est=450.00 KB 
+     ├─ [D] Height :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] MAP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB   
+     ├─ [D] PPG_features :: shape=(28, 57600), dtype=float64, no-filters, est=12.30 MB
+     ├─ [D] SBP :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] SF :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+     ├─ [D] Subject :: shape=(57600, 1), dtype=object, no-filters, est=450.00 KB
+     └─ [D] Weight :: shape=(57600, 1), dtype=float32, no-filters, est=225.00 KB
+
+    Args
+    ----
+    file_path : str | Path
+        Path to the .h5 file
+    feature_names : list[str], optional
+        Names for the PPG features (length must match number of rows in PPG_features)
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with metadata + target columns + PPG feature columns
+    """
+    file_path = Path(file_path)
+    with h5py.File(file_path, "r") as f:
+        # Load scalars (all shape (N,1))
+        n_samples = f["Age"].shape[0]
+        data_dict = {
+            "Age": np.array(f["Age"]).reshape(-1),
+            "BMI": np.array(f["BMI"]).reshape(-1),
+            "DBP": np.array(f["DBP"]).reshape(-1),
+            "Gender": np.array(f["Gender"]).astype(str).reshape(-1),
+            "Height": np.array(f["Height"]).reshape(-1),
+            "MAP": np.array(f["MAP"]).reshape(-1),
+            "SBP": np.array(f["SBP"]).reshape(-1),
+            "SF": np.array(f["SF"]).reshape(-1),
+            "Subject": np.array(f["Subject"]).astype(str).reshape(-1),
+            "Weight": np.array(f["Weight"]).reshape(-1),
+        }
+
+        # Load and transpose PPG features (28, N) → (N, 28)
+        ppg_arr = np.array(f["PPG_features"]).T
+
+        # Assign names
+        if feature_names is None:
+            feature_names = [f"PPG_feat{i+1}" for i in range(ppg_arr.shape[1])]
+        elif len(feature_names) != ppg_arr.shape[1]:
+            raise ValueError(
+                f"feature_names length {len(feature_names)} != number of PPG features {ppg_arr.shape[1]}"
+            )
+
+        for i, name in enumerate(feature_names):
+            data_dict[name] = ppg_arr[:, i]
+
+    # Assemble DataFrame with desired order
+    df = pd.DataFrame(data_dict)
+
+    ordered_cols = [
+        "Subject", "Age", "Gender", "Height", "Weight",
+        "BMI", "SF", "SBP", "DBP", "MAP"
+    ] + feature_names
+
+    return df[ordered_cols]
 
 #====================================================================
