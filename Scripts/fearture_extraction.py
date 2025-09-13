@@ -130,6 +130,7 @@ class Feature_Extraction():
 
             print(f"patient: {i}")
             for sig in np.arange(len(data[i])): # Processing each signal
+                print(sig)
                 signal.name = sig
                 signal.start_sig = 0
                 signal.end_sig = len(data[i][sig])
