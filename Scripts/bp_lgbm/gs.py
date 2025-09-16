@@ -78,14 +78,15 @@ def run_grid_search(
             param_distributions=param_grid,
             n_iter=n_iter,
             cv=cv,
-            scoring="neg_mean_squared_error",
+            scoring=scoring,
             n_jobs=-1,
             verbose=verbose,
-            random_state=42
+            random_state=42,
+            return_train_score = True
         )
     else:
         raise ValueError(f"Unknown search_mode: {search_mode}")
-    search.fit(X, y)
+    search.fit(X, y, groups = groups)
 
     # convert results into a dataframe
     results_df = pd.DataFrame(search.cv_results_)
