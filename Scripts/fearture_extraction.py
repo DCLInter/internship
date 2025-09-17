@@ -27,7 +27,6 @@ class Feature_Extraction():
         self.signal_dict = {}
         self.mean = {}
         self.median = {}
-        self.empty = {}
 
         self.filename_save = h5name
         self.filename_csv = csvname
@@ -93,6 +92,62 @@ class Feature_Extraction():
             Med.loc[0,ft] = features[ft].median()
 
         return X, Med
+    
+    def only_fiducials(self):
+        data = self.data
+        segment_ids = self.segment_ids
+        demo_info = self.demo_info
+        signal_dict = self.signal_dict
+
+        for i in data.keys():
+            signal = DotMap()
+            signal.filtering = True # whether or not to filter the PPG signal
+            signal.fL=0.5000001 # Lower cutoff frequency (Hz)
+            signal.fH=12 # Upper cutoff frequency (Hz)
+            signal.order=4 # Filter order
+            signal.sm_wins={'ppg':50,'vpg':10,'apg':10,'jpg':10} # smoothing windows in millisecond for the PPG, PPG', PPG", and PPG'"
+        
+            # Initialise the correction for fiducial points
+            corr_on = ['on', 'dn', 'dp', 'v', 'w', 'f']
+            correction=pd.DataFrame()
+            correction.loc[0, corr_on] = True
+            signal.correction=correction
+
+            #Initialise cycling storage variables
+            fp_pt = pd.DataFrame()
+            fp_pt_list = []
+
+            print(f"patient: {i}")
+            for sig in np.arange(len(data[i])): # Processing each signal
+                
+                if sig % 10000 == 0:
+                    print(sig)
+                signal.name = sig
+                signal.start_sig = 0
+                signal.end_sig = len(data[i][sig])
+                signal.v = data[i][sig]
+                signal.fs = int(demo_info[i]["SamplingFrequency"])
+
+                #### Preprocess the signal with pyPPG (filtering and acquires the derivatives)
+                prep = PP.Preprocess(fL=signal.fL, fH=signal.fH, order=signal.order, sm_wins=signal.sm_wins)
+                signal.ppg, signal.vpg, signal.apg, signal.jpg = prep.get_signals(s=signal)
+
+                # Create a PPG class
+                s = PPG2(signal)
+
+                # Acquire the fiducial points
+                fpex = FP2.FpCollection(s=s)
+                fiducials = fpex.get_fiducials(s=s)
+                df = pd.DataFrame(fiducials)
+                # Saving the extracted fiducials (flattened so each row will be a singular signal)
+                df = df.values.flatten()
+                fp_pt_list.append(df)
+
+            fp_pt = pd.DataFrame(fp_pt_list)
+            fp_pt.insert(0,"segment_ID",segment_ids[i])
+            signal_dict[i] = fp_pt.T
+        
+        return signal_dict
 
     def feature_extraction(self, save: bool = True):
         data = self.data
@@ -103,7 +158,6 @@ class Feature_Extraction():
         signal_dict = self.signal_dict
         mean = self.mean
         median = self.median
-        empty = self.empty
         
         for i in data.keys():
             signal = DotMap()
@@ -125,11 +179,12 @@ class Feature_Extraction():
             ft_pt_median = pd.DataFrame()
             fp_pt_list = []
             fp_col = []
-            empty[i] = []
             samples[i] = []
 
             print(f"patient: {i}")
+            
             for sig in np.arange(len(data[i])): # Processing each signal
+                
                 print(sig)
                 signal.name = sig
                 signal.start_sig = 0
@@ -143,7 +198,6 @@ class Feature_Extraction():
 
                 # Create a PPG class
                 s = PPG2(signal)
-                samples[i].append(len(s.ppg))
 
                 # Acquire the fiducial points
                 fpex = FP2.FpCollection(s=s)
@@ -155,6 +209,7 @@ class Feature_Extraction():
                 # Just saving the names of the fiducials for later use in the h5 file
                 df = pd.DataFrame(fiducials)
                 if  sig == 0:
+                    samples[i].append(len(s.ppg))
                     fp_col = df.columns
                 else:
                     pass
@@ -179,14 +234,10 @@ class Feature_Extraction():
                     PRV = np.diff(Tpp, prepend=Tpp[0])
                     PRV = PRV*1000 # to ms
                     df["PRV"] = PRV 
-
                     # interquartil range, standart deviation of PRV
                     sdPRV = pd.Series(PRV).std()
                     IQR = scipy.stats.iqr(PRV)
                 else:
-                    # empty will be a csv containing the signals in which Tpp is to small/empty meaning that either
-                    # the signal was too small or the library couldnt pick up properly the peaks and fiducials
-                    empty[i].append(segment_ids[i][sig])
                     df["PRV"] = np.nan
                     sdPRV = np.nan
                     IQR = np.nan
@@ -222,16 +273,5 @@ class Feature_Extraction():
         if save:
             print("Saving in: ",self.filename_save)
             self.save_h5(signal_dict,mean,median,fiducials_names=fp_col, filename=self.filename_save)
-        
-        # Saving the signals that could not be processed due to empty fiducials
-        df_empty = pd.DataFrame({
-        'patient': list(empty.keys()),
-        'segment_id': [v for v in empty.values()],
-        'amount': [len(v) for v in empty.values()],
-        'signals_total': [len(data[v]) for v in list(empty.keys())],
-        '%': [(len(s)/len(data[p]))*100 for p,s in empty.items()]
-        })
-        if save:
-            df_empty.to_csv(self.filename_csv,index=False)
 
-        return mean,median,df_empty,signal_dict
+        return mean,median,signal_dict

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from metrics_functions import Metrics
 class Checker:
-    def __init__(self, datapath: str, threshold: dict = {}):
+    def __init__(self, datapath: str = "", threshold: dict = {}, data_ext: dict = {}):
 
         self.path = datapath
         self.data = {}
@@ -13,30 +13,33 @@ class Checker:
         self.df_results = {}
         self.threshold = threshold
         
-        with h5py.File(self.path, 'r') as f:
-            for group_name in f:
-                group = f[group_name]
-                self.data[group_name] = {}
+        if data_ext:
+            self.data = data_ext
+        elif datapath != "":
+            with h5py.File(self.path, 'r') as f:
+                for group_name in f:
+                    group = f[group_name]
+                    self.data[group_name] = {}
 
-                if "N-samples" in group["segments"].attrs:
-                    self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
+                    if "N-samples" in group["segments"].attrs:
+                        self.Nsamples[group_name] = f[group_name]["segments"].attrs["N-samples"]
 
-                self.ids[group_name] = list(group["segments"][0])
-                
-                for dtset_name in group:
-                    self.data[group_name][dtset_name] = group[dtset_name][()]
-                    if dtset_name == "segments":
-                        self.data[group_name][dtset_name] = group[dtset_name][1:]
+                    self.ids[group_name] = list(group["segments"][0])
+                    
+                    for dtset_name in group:
+                        self.data[group_name][dtset_name] = group[dtset_name][()]
+                        if dtset_name == "segments":
+                            self.data[group_name][dtset_name] = group[dtset_name][1:]
 
-                if group_name not in self.demo_info:
-                    self.demo_info[group_name] = {}
-                for attr_name, attr_value in group.attrs.items():
-                    self.demo_info[group_name][attr_name] = attr_value   
-            ### The name and amount of fiducial points and features are the same for all patients
-            fiducial = f[group_name]["segments"].attrs['fiducial_order']
-            features = f[group_name]["mean"].attrs['features']
-            self.fiducial_order = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
-            self.features_names = [f.decode() if isinstance(f, bytes) else f for f in features]
+                    if group_name not in self.demo_info:
+                        self.demo_info[group_name] = {}
+                    for attr_name, attr_value in group.attrs.items():
+                        self.demo_info[group_name][attr_name] = attr_value   
+                ### The name and amount of fiducial points and features are the same for all patients
+                fiducial = f[group_name]["segments"].attrs['fiducial_order']
+                features = f[group_name]["mean"].attrs['features']
+                self.fiducial_order = [f.decode() if isinstance(f, bytes) else f for f in fiducial]
+                self.features_names = [f.decode() if isinstance(f, bytes) else f for f in features]
 
     def windows(self, patient: str, signal = None):
         
@@ -89,7 +92,7 @@ class Checker:
                 
                 ### Settings
                 fs = int(self.demo_info[patient]["SamplingFrequency"])
-                nsamples = self.Nsamples[patient][idx]
+                nsamples = self.Nsamples[patient]
 
                 ### Adquaring the windows to analice per signal
                 df_fiducials = self.windows(patient,idx)
