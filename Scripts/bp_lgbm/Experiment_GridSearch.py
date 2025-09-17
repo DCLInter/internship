@@ -11,16 +11,17 @@ EXPERIMENT DESCRIPTION:
 - Settings: 5 folds CV - group patient wise splitting, full grid search, optimization for the three targets (SBP, DBP, MAP).
 - Preprocessing details: Inputation strategy is meadian based on patient entries! Scaler is fitted only on training set.
 - Imputation for labels:
-•	It appears that MAP is full, so I am going to fill those NaNs with the formula for calculating MAP based on DBP and SBP.
-•	If by any chance, both SBP and DBP are missing, I am going to impute one of them based on the mean of the adjacent 5 values 
+- It appears that MAP is full, so I am going to fill those NaNs with the formula for calculating MAP based on DBP and SBP.
+- If by any chance, both SBP and DBP are missing, I am going to impute one of them based on the mean of the adjacent 5 values 
     for SBP and use the method above to calculate the DBP.
 
 """
 import preprocessing
 import gs
 from pathlib import Path
-from data import load_patient_dataset, load_group_attributes
-from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_ultralean_grid_3target
+#from local_paths import PULSE_DB_SUP_DIR
+from data import load_PulseDB_sup_ds
+from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_small_grid_3target
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.pipeline import Pipeline
@@ -32,82 +33,63 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    folder_path = Path("data_features")
-    labels_path = folder_path/ "BP_values.h5"
-    data_messy_path = folder_path /"features_original.h5"
+    train_original_path = Path(r"data_features") / "Features_complete_VitalDB_Train_Subset.h5"
 
     # =========================================================
     # Load Data
     #==========================================================
-    df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
-    labels_original_df = load_patient_dataset(labels_path, column_names=["SBP", "DBP", "MAP"])
-    metadata_original_df = load_group_attributes(data_messy_path)
-
-    # =========================================================
-    # Solucionar machetazos
-    #==========================================================
-    df_feat_orig_mean = preprocessing.drop_abp_features(df_feat_orig_mean, patient_col="Patient")
-    metadata_original_df["Total_signals"] = metadata_original_df["Total_signals"]//2
+    feature_names = ["IPR", "Tsp", "TWRRF25", "TWRRF50", "Tsw25", 
+                 "Tsw50", "Tsw75", "Tdw25", "Tdw50", "Tdw75", 
+                 "AUCpi", "IPA",  "Av-Au_ratio", "Ab-Aa_ratio", "Ac-Aa_ratio", 
+                 "Ad-Aa_ratio", "Ap2-Ap1_ratio", "AGI", "Kurtosis", "Skewness", 
+                 "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
+                 "FullSkew", "sdPRV", "IQR_PRV"]
+    df = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
+    """
+    print(df.info())
+    print(df.head())
+    """
 
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
+    """
+    print("************************************************************")
+    print("Check NaNs")
+    print("************************************************************")
 
+    # Check if any NaN at all
+    print("Is there any NaN in: df_features_mean?")
+    print(df.isna().any().any())
+    # Count total number of NaNs
+    print(df.isna().sum())
+    """
+    
     # Fill X NaNs
-    X_df_original_feat = preprocessing.median_impute_patientwise(df_feat_orig_mean, patient_col= "Patient")
-    print("Checking NaN after inputation in X:", X_df_original_feat.isna().any().any())
-
-    # Fill Y NaNs
-    Y_df_original_feat = preprocessing.fill_missing_bp(labels_original_df)
-    print(Y_df_original_feat.info())
+    df = preprocessing.median_impute_patientwise(df, patient_col= "Subject")
 
     # =========================================================
-    # X and Y dfs merging
+    # Downsample the dataset --> balanced based on the subject
     #==========================================================
-    XY_df = preprocessing.merge_XY(X_df_original_feat, Y_df_original_feat) # When possible, add the parmeter "on: Segements_ID"
-
-    # =========================================================
-    # Splitting process of the dataset IDs - patyient wise
-    #==========================================================
-    split_results = preprocessing.split_patients_by_signal_share(meta_df= metadata_original_df,
-                                                 threshold= 0.8,
-                                                 margin = 0.02,
-                                                 patient_col="Patient",
-                                                 signals_col= "Total_signals",
-                                                 prefer="asc"
-                                                 )
-    print("Training subjects:", len(split_results["selected_ids"])) # OJOOO the logic here states that for me the "selected" set is for training
-    print("Testing subjects:", len(split_results["remaining_ids"]))
-
-    df_train, df_test = preprocessing.split_train_test(XY=XY_df, split_results=split_results, patient_col="Patient")
-
-    # =========================================================
-    # Splitting into X and Y
-    #==========================================================
-    X_df_train, Y_df_train = preprocessing.split_XY(df_train,
-                                                    target_cols= ["SBP", "DBP", "MAP"],
-                                                    id_cols= ["Patient"]
-                                                    )
-
-    X_df_test, Y_df_test = preprocessing.split_XY(df_test,
-                                                    target_cols= ["SBP", "DBP", "MAP"],
-                                                    id_cols= ["Patient"]
-                                                    )
+    df_downsampled = preprocessing.downsample_per_patient(df, patient_col="Subject", proportion = 0.1)
+    print(df_downsampled.info())
     
     # =========================================================
     # Initialize model
     #==========================================================
     # drop ID columns before training
-    id_cols = ["Patient"]
+    id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"]
     targets = ["SBP", "DBP", "MAP"]
-    groups = X_df_train["Patient"]
-    X_train = X_df_train.drop(columns=id_cols)
-    Y_train = Y_df_train[targets]   # or whatever target you want
+    id_cols.extend(targets)
+    print(id_cols)
+    groups = df_downsampled["Subject"]
+    Y_train = df_downsampled[targets]
+    X_train = df_downsampled.drop(columns=id_cols)
 
     # build the model
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
-                           experiment_name="Grid_Search_3Targets",
+                           experiment_name="Full_Grid_Randomized_search_3targets",
                            verbose = -1,
                            model_params=lightGBM_default_params)
     lgbm = build_lgbm(cfg)
@@ -127,13 +109,14 @@ if __name__ == "__main__":
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_ultralean_grid_3target,
+                                            param_grid=lightGBM_small_grid_3target,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
                                             verbose=0,
-                                            search_mode="grid",
-                                            n_iter=100
+                                            search_mode="random",
+                                            n_iter=30,
+                                            scoring="neg_mean_squared_error"
                                             )
     
     print("Best parameters:", search.best_params_)
