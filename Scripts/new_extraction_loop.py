@@ -2,10 +2,10 @@ from fearture_extraction import Feature_Extraction
 import numpy as np
 import pandas as pd
 import h5py
-from bp_lgbm.local_paths import PULSE_DB_SUP_DIR
+#from bp_lgbm.local_paths import PULSE_DB_SUP_DIR
 
-data_path = PULSE_DB_SUP_DIR / "VitalDB_Train_Subset.h5"
-#data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
+#data_path = PULSE_DB_SUP_DIR / "VitalDB_Train_Subset.h5"
+data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -15,37 +15,39 @@ with h5py.File(data_path, 'r') as f:
 print(data["PPG"].shape)
 data_ext = {}
 
-splits = [0, 100000, 200000, 300000, 400000, len(data["PPG"])]
+splits = [0, 10, 20, 30, 40, 50]
 
 features_list = list()
 fiducials_list = list()
 
 for i in range (4, len(splits)-1):
 
-    data_ext = data["PPG"][splits[i]:splits[i+1]]
+    data_ext["P1"] = data["PPG"][splits[i]:splits[i+1]]
 
     ftext = Feature_Extraction(data_ext=data_ext)
 
     demo_info = {}
-    demo_info = {}
-    demo_info["SamplingFrequency"] = data["SF"][0][0] # 125 Hz
-    print(demo_info["SamplingFrequency"])
+    demo_info["P1"] = {}
+    demo_info["P1"]["SamplingFrequency"] = data["SF"][0][0] # 125 Hz
+    print(demo_info["P1"]["SamplingFrequency"])
     ftext.demo_info = demo_info
 
     segment_ids = {}
-    segment_ids = np.arange(1,len(data_ext)+1)
+    segment_ids["P1"] = np.arange(1,len(data_ext["P1"])+1)
     ftext.segment_ids = segment_ids
 
-    features_means, features_medians, failed, fiducial_points = ftext.feature_extraction(save=False)
-    df = features_means.T
+    features_means, features_medians, fiducial_points = ftext.feature_extraction(save=False)
+    df = features_means["P1"].T
+    print(df)
     df.drop(columns=["segment_ID"], inplace=True)
     df = df.T
+    
 
     # Convert into dictionaries and then append it
     dict_feat = df.to_dict(orient="list")
     features_list.append(dict_feat)
 
-    df_fidu = fiducial_points.T
+    df_fidu = fiducial_points["P1"].T
     df_fidu.drop(columns=["segment_ID"], inplace=True)
     df_fidu = df_fidu.T
 
