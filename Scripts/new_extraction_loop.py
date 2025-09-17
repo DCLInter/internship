@@ -2,10 +2,10 @@ from fearture_extraction import Feature_Extraction
 import numpy as np
 import pandas as pd
 import h5py
-#from bp_lgbm.local_paths import PULSE_DB_SUP_DIR
+from bp_lgbm.local_paths import PULSE_DB_SUP_DIR
 
-#data_path = PULSE_DB_SUP_DIR / "VitalDB_Train_Subset.h5"
-data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
+data_path = PULSE_DB_SUP_DIR / "VitalDB_Train_Subset.h5"
+#data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -20,8 +20,8 @@ splits = [0, 10, 20, 30, 40, 50]
 features_list = list()
 fiducials_list = list()
 
-for i in range (4, len(splits)-1):
-
+for i in range(0, len(splits)-1):
+    
     data_ext["P1"] = data["PPG"][splits[i]:splits[i+1]]
 
     ftext = Feature_Extraction(data_ext=data_ext)
@@ -38,10 +38,11 @@ for i in range (4, len(splits)-1):
 
     features_means, features_medians, fiducial_points = ftext.feature_extraction(save=False)
     df = features_means["P1"].T
-    print(df)
+    #print(df)
+    df.index = df["segment_ID"]
     df.drop(columns=["segment_ID"], inplace=True)
     df = df.T
-    
+    #print(df)
 
     # Convert into dictionaries and then append it
     dict_feat = df.to_dict(orient="list")
@@ -56,14 +57,16 @@ for i in range (4, len(splits)-1):
     fiducials_list.append(dict_fid)
 
 # later: rebuild DataFrames and concat
-dfs_feat = [pd.DataFrame(d) for d in dict_feat]
-final_feat_df = pd.concat(dfs_feat, ignore_index=True)
+dfs_feat = [pd.DataFrame(d) for d in features_list]
+final_feat_df = pd.concat(dfs_feat, ignore_index=True, axis=1)
 print(final_feat_df.head())
+print(final_feat_df.shape)
 
 # later: rebuild DataFrames and concat
-dfs_fid = [pd.DataFrame(d) for d in dict_feat]
-final_fid_df = pd.concat(dfs_feat, ignore_index=True)
+dfs_fid = [pd.DataFrame(d) for d in fiducials_list]
+final_fid_df = pd.concat(dfs_fid, ignore_index=True, axis=1)
 print(final_fid_df.head())
+print(final_fid_df.shape)
 
 with h5py.File('D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_Train_Subset.h5', 'w') as f:
     for g in data.keys():
