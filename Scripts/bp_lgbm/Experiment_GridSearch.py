@@ -19,9 +19,9 @@ EXPERIMENT DESCRIPTION:
 import preprocessing
 import gs
 from pathlib import Path
-#from local_paths import PULSE_DB_SUP_DIR
+from local_paths import PULSE_DB_SUP_DIR
 from data import load_PulseDB_sup_ds
-from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_small_grid_3target
+from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_full_grid_3target
 from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.pipeline import Pipeline
@@ -33,7 +33,9 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = Path(r"data_features") / "Features_complete_VitalDB_Train_Subset.h5"
+    #train_original_path = Path(r"data_features") / "Features_complete_VitalDB_Train_Subset.h5"
+    # Local paths for GS
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
 
     # =========================================================
     # Load Data
@@ -91,7 +93,8 @@ if __name__ == "__main__":
                            random_state=42, 
                            experiment_name="Full_Grid_Randomized_search_3targets",
                            verbose = -1,
-                           model_params=lightGBM_default_params)
+                           model_params=lightGBM_default_params,
+                           n_jobs = 1)
     lgbm = build_lgbm(cfg)
     model = MultiOutputRegressor(lgbm)
 
@@ -109,13 +112,13 @@ if __name__ == "__main__":
                                             X=X_train,
                                             y=Y_train,
                                             groups=groups,
-                                            param_grid=lightGBM_small_grid_3target,
+                                            param_grid=lightGBM_full_grid_3target,
                                             n_splits=cfg.n_splits,
                                             cv_type="group",
                                             save_results=True,
-                                            verbose=0,
+                                            verbose=-1,
                                             search_mode="random",
-                                            n_iter=30,
+                                            n_iter=50,
                                             scoring="neg_mean_squared_error"
                                             )
     

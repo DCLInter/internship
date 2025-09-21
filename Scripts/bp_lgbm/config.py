@@ -22,6 +22,7 @@ class ExperimentConfig:
     experiment_name: str = "baseline"
     verbose:int = -1
     model_params: dict = None
+    n_jobs = -1
 
 # ----------------------------
 # Models Configs
