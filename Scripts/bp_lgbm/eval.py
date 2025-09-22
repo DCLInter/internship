@@ -37,15 +37,27 @@ def bland_altman_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "bland
     loa_low = bias - 1.96 * sd
     loa_high = bias + 1.96 * sd
 
-    plt.figure(figsize=(6, 5), dpi=140)
-    plt.scatter(means, diffs, alpha=0.5, s=12)
-    plt.axhline(bias, linestyle="--", linewidth=1.5, label=f"Bias = {bias:.2f}")
-    plt.axhline(loa_low, linestyle=":", linewidth=1.5, label=f"LoA low = {loa_low:.2f}")
-    plt.axhline(loa_high, linestyle=":", linewidth=1.5, label=f"LoA high = {loa_high:.2f}")
-    plt.xlabel("Mean of prediction and reference")
-    plt.ylabel("Prediction − Reference")
-    plt.title("Bland–Altman Plot")
-    plt.legend(loc="best", frameon=True)
+    plt.figure(figsize=(7, 6), dpi=140)
+    plt.scatter(means, diffs, alpha=0.4, s=12, color="steelblue", edgecolor="none")
+
+    # Bias line in black, thicker
+    plt.axhline(bias, color="black", linestyle="--", linewidth=2, label=f"Bias = {bias:.2f}")
+
+    # LoA lines in red, thicker
+    plt.axhline(loa_low, color="red", linestyle=":", linewidth=2, label=f"LoA low = {loa_low:.2f}")
+    plt.axhline(loa_high, color="red", linestyle=":", linewidth=2, label=f"LoA high = {loa_high:.2f}")
+
+    # Labels with formulas in parentheses
+    plt.xlabel("Mean of prediction and reference ( (ŷ + y) / 2 )", fontsize=12, weight="bold")
+    plt.ylabel("Prediction − Reference ( ŷ − y )", fontsize=12, weight="bold")
+
+    # Title larger and bold
+    plt.title("Bland–Altman Plot", fontsize=16, weight="bold")
+
+    # Grid for readability
+    plt.grid(True, linestyle="--", alpha=0.6)
+
+    plt.legend(loc="best", frameon=True, fontsize=10)
     plt.tight_layout()
     plt.savefig(path, bbox_inches="tight")
     plt.close()
@@ -57,6 +69,7 @@ def bland_altman_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "bland
         "loa_high": float(loa_high),
         "plot_path": path,
     }
+
 
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray, path: str) -> Dict[str, float]:
     """
