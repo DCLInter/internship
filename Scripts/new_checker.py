@@ -4,8 +4,8 @@ import h5py
 import numpy as np
 import pandas as pd
 
-path_fiducials = "D:/U/Practicas_City_University_of_London/Data/Fiducial_points_separated_VitalDB_Train_Subset.h5"
-path_originalData = "C:/Users/adhn565/Documents/Data/patient_data.h5"
+path_fiducials = "D:/U/Practicas_City_University_of_London/Data/Fiducial_Points_VitalDB_CalFree_Test_Subset 1.h5"
+path_originalData = "C:/Users/adhn565/Documents/Data/Features_VitalDB_CalFree_Test_Subset 1.h5"
 filename_report = "D:/U/Practicas_City_University_of_London/Data/metrics_465k.h5"
 filename_cleanData = "D:/U/Practicas_City_University_of_London/Data/features_patients_clean.h5"
 filename_csvReport = "general_report.csv"
@@ -31,21 +31,19 @@ with h5py.File(path_fiducials, 'r') as f:
             data[group_name] = {}
             for dst in group:
                 data[group_name][dst] = group[dst][()]
-print(data["PPG_fiducial_points"].keys())
-data_ext = {}
-for k in data["PPG_fiducial_points"].keys():
-    data_ext[k] = {}
-    data_ext[k]["segments"] = data["PPG_fiducial_points"][k]
 
-print(data_ext["First_100k"]["segments"].shape)
+data_ext = {}
+data_ext["P1"] = {}
+data_ext["P1"]["segments"] = data["PPG_fiducial_points"]["Fiducials"]
+
+print(data_ext["P1"]["segments"].shape)
 ck = Checker(thresholds, data_ext=data_ext)
 
 segment_ids = {}
-for k in data["PPG_fiducial_points"].keys():
-        segment_ids[k] = np.arange(1,data["PPG_fiducial_points"][k].shape[1]+1)
+segment_ids["P1"] = np.arange(1,data["PPG_fiducial_points"]["Fiducials"].shape[1]+1)
 ck.ids = segment_ids
-ck.demo_info = {k: {"SamplingFrequency": 125} for k in data["PPG_fiducial_points"].keys()}
-ck.Nsamples = {k: 1250 for k in data["PPG_fiducial_points"].keys()}
+ck.demo_info = {"P1": {"SamplingFrequency": 125} }
+ck.Nsamples = {"P1": 1250 }
 ck.fiducial_order = ['on','sp','dn','dp','off','u','v','w','a','b','c','d','e','f','p1','p2']
 
 dictScore = ck.metrics()
