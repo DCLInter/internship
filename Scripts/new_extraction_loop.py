@@ -15,7 +15,7 @@ with h5py.File(data_path, 'r') as f:
 print(data["PPG"].shape)
 data_ext = {}
 
-splits = [0, 10, 20, 30, 40, 50]
+splits = [0, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, len(data["PPG"])]
 
 features_list = list()
 fiducials_list = list()
@@ -68,7 +68,9 @@ final_fid_df = pd.concat(dfs_fid, ignore_index=True, axis=1)
 print(final_fid_df.head())
 print(final_fid_df.shape)
 
-with h5py.File('D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_Train_Subset.h5', 'w') as f:
+final_fid_df = final_fid_df.replace({pd.NA: np.nan})
+
+with h5py.File('Features_VitalDB_Train_Subset.h5', 'w') as f:
     for g in data.keys():
         if g == "PPG" or g == "ABP":
             continue
@@ -76,6 +78,6 @@ with h5py.File('D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_T
     group = f.create_group("PPG_features")
     group.create_dataset("Features", data= final_feat_df.to_numpy(dtype=np.float64, na_value=np.nan))
     
-with h5py.File('D:/U/Practicas_City_University_of_London/Data/Fiducial_Points_VitalDB_Train_Subset.h5', 'w') as f:
+with h5py.File('Fiducial_Points_VitalDB_Train_Subset.h5', 'w') as f:
     group = f.create_group("PPG_fiducial_points")
     group.create_dataset("Fiducials", data= final_fid_df.to_numpy(dtype=np.float64, na_value=np.nan))
