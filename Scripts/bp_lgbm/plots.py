@@ -1,50 +1,111 @@
-import numpy as np
-import local_paths
+############ PLOTS CODE #######################################
+#                                                             #
+# All of the plots stored here                                #
+#                                                             #
+###############################################################
+
+import seaborn as sns
 import matplotlib.pyplot as plt
-import preprocessing
-from data import load_patient_dataset, load_group_attributes
+import pandas as pd
 
-if __name__ == "__main__":
+sns.set_style("whitegrid")
 
-    # =========================================================
-    # Paths
-    #==========================================================
-    data_path_cleaned = local_paths.DATA_DIR /"features_patients_clean.h5"
-    labels_path = local_paths.LABELS_DIR / "BP_values.h5"
-    data_messy_path = local_paths.DATA_DIR /"features_patients.h5"
+# =========================================================
+# Demographics plots
+#==========================================================
+# Color mapping for demographics
+demo_colors = {
+    "Age": "#1f77b4",      # blue
+    "BMI": "#ff7f0e",      # orange
+    "Height": "#2ca02c",   # green
+    "Weight": "#9467bd",   # purple
+    "SBP": "#d62728",      # red
+    "DBP": "#17becf"       # teal
+}
 
-    # =========================================================
-    # Load Data
-    #==========================================================
+
+def plot_numeric_distributions(df, cols, dataset_name="Train"):
+    """Plot histograms for numeric demographic variables."""
+    for col in cols:
+        plt.figure(figsize=(6,4))
+        sns.histplot(
+            df[col], bins=30, kde=False,
+            color=demo_colors.get(col, "gray"), edgecolor="black"
+        )
+        plt.title(f"{col} distribution ({dataset_name})", fontsize=14, weight="bold")
+        plt.xlabel(col, fontsize=12)
+        plt.ylabel("Count", fontsize=12)
+        plt.tight_layout()
+        plt.show()
+
+def plot_gender_distribution(df, dataset_name="Train"):
+    """Plot gender distribution with Male=blue, Female=red."""
+    plt.figure(figsize=(6,4))
+    gender_order = ["M", "F"] if "M" in df["Gender"].unique() else None
+    sns.countplot(
+        x="Gender", data=df,
+        order=gender_order,
+        palette={"M": "blue", "F": "red"}
+    )
+    plt.title(f"Gender distribution ({dataset_name})", fontsize=14, weight="bold")
+    plt.xlabel("Gender", fontsize=12)
+    plt.ylabel("Count", fontsize=12)
+    plt.tight_layout()
+    plt.show()
+
+def plot_threshold_proportions(df, thresholds_dict, dataset_name="Dataset", subject_col="Subject"):
     """
-    inspect_file(data_messy_path, show_attrs=True)
-    inspect_file(labels_path, show_attrs=True)
+    Plot bar plots showing number of signals, percentage, 
+    and number of unique subjects (in parentheses).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe containing the variables.
+    thresholds_dict : dict
+        Dictionary with variable name as key and list of thresholds as value.
+        Example: {"Age": [40, 60], "BMI": [18.5, 25, 30]}
+    dataset_name : str
+        Label to show in the plot titles.
+    subject_col : str
+        Column name for subject IDs.
     """
+    for col, cutoffs in thresholds_dict.items():
+        if col not in df.columns:
+            print(f"⚠️ Skipping {col}: not found in DataFrame.")
+            continue
 
-    df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
-    labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["SBP", "DBP", "MAP", "segment_ID"])
-    metadata_original_df = load_group_attributes(data_messy_path)
-    df_feat_cleaned_mean = load_patient_dataset(data_path_cleaned, dataset_type="mean")
-    # =========================================================
-    # Check NaNs and fill them
-    #==========================================================
-    """
-    print("************************************************************")
-    print("Check NaNs")
-    print("************************************************************")
-    
-    # Check if any NaN at all
-    print("Is there any NaN in: df_features_mean?")
-    print(df_feat_orig_mean.isna().any().any())
-    # Count total number of NaNs
-    print(df_feat_orig_mean.isna().sum())
-    """
+        # Build bins
+        bins = [df[col].min()] + cutoffs + [df[col].max()]
+        labels = [f"{bins[i]:.1f}–{bins[i+1]:.1f}" for i in range(len(bins)-1)]
 
-    # Fill X NaNs
-    X_df_original_feat = preprocessing.median_impute_patientwise(df_feat_orig_mean)
-    print("Checking NaN after inputation in X:", X_df_original_feat.isna().any().any())
+        # Bin data
+        binned = pd.cut(df[col], bins=bins, labels=labels, include_lowest=True, right=False)
 
-    # Fill Y NaNs
-    Y_df_original_feat = preprocessing.fill_missing_bp(labels_original_df)
+        # Counts and percentages
+        counts = binned.value_counts().sort_index()
+        percentages = counts / counts.sum() * 100
 
-    plt.figure()
+        # Unique subjects per bin
+        subjects_per_bin = df.groupby(binned)[subject_col].nunique().reindex(labels)
+
+        # Update labels to include subjects
+        labels_with_subjects = [f"{lab}\n({subs} subj.)" for lab, subs in zip(labels, subjects_per_bin)]
+
+        # Plot
+        plt.figure(figsize=(8,5))
+        ax = sns.barplot(
+            x=labels_with_subjects, y=counts.values,
+            color=demo_colors.get(col, "gray")
+        )
+
+        # Annotate with percentages
+        for i, (c, p) in enumerate(zip(counts.values, percentages.values)):
+            ax.text(i, c + max(counts.values)*0.01, f"{p:.1f}%", 
+                    ha="center", va="bottom", fontsize=10, weight="bold")
+
+        plt.title(f"{col} categories ({dataset_name})", fontsize=14, weight="bold")
+        plt.ylabel("Number of signals")
+        plt.xlabel(col)
+        plt.xticks(rotation=45)
+        plt.show()
