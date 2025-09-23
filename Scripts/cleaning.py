@@ -31,37 +31,43 @@ class Cleaner:
 
         return remove
     
-    def clean(self,original_datapath: str):
+    def clean(self,original_datapath: str = "", data_ext: dict = None):
 
         print("Cleaning process:")
-        self.original_data = {}
-        original_ids = {}
-        self.clean_data = {}
-        self.demo_info = {}
-        self.attributes = {}
-        data = {}
-        with h5py.File(original_datapath, 'r') as f:
-            for group_name in f:
-                group = f[group_name]
-                dataset_names = list(group.keys())
-                original_ids[group_name] = group[dataset_names[0]][0]
-                self.original_data[group_name] = {}
-                data[group_name] = {}
-                self.attributes[group_name] = {}
-                for dst_name in group:
-                    self.original_data[group_name][dst_name] = group[dst_name][:].T
-                    self.original_data[group_name][dst_name] = pd.DataFrame(self.original_data[group_name][dst_name],index=original_ids[group_name])
-                    data[group_name][dst_name] = self.original_data[group_name][dst_name]
-                    attribute = {}
-                    for attr_name, value in f[group_name][dst_name].attrs.items():
-                        vdecode = [v.decode() if isinstance(v, bytes) else v for v in value]
-                        attribute[attr_name] = vdecode
-                    self.attributes[group_name][dst_name] = attribute
+        if data_ext is not None:
+            self.original_data = data_ext
+            data = data_ext
+            self.demo_info = {}
+            self.attributes = {}
+        else:
+            self.original_data = {}
+            original_ids = {}
+            self.clean_data = {}
+            self.demo_info = {}
+            self.attributes = {}
+            data = {}
+            with h5py.File(original_datapath, 'r') as f:
+                for group_name in f:
+                    group = f[group_name]
+                    dataset_names = list(group.keys())
+                    original_ids[group_name] = group[dataset_names[0]][0]
+                    self.original_data[group_name] = {}
+                    data[group_name] = {}
+                    self.attributes[group_name] = {}
+                    for dst_name in group:
+                        self.original_data[group_name][dst_name] = group[dst_name][:].T
+                        self.original_data[group_name][dst_name] = pd.DataFrame(self.original_data[group_name][dst_name],index=original_ids[group_name])
+                        data[group_name][dst_name] = self.original_data[group_name][dst_name]
+                        attribute = {}
+                        for attr_name, value in f[group_name][dst_name].attrs.items():
+                            vdecode = [v.decode() if isinstance(v, bytes) else v for v in value]
+                            attribute[attr_name] = vdecode
+                        self.attributes[group_name][dst_name] = attribute
 
-                if group_name not in self.demo_info:
-                    self.demo_info[group_name] = {}
-                for attr_name, attr_value in group.attrs.items():
-                    self.demo_info[group_name][attr_name] = attr_value
+                    if group_name not in self.demo_info:
+                        self.demo_info[group_name] = {}
+                    for attr_name, attr_value in group.attrs.items():
+                        self.demo_info[group_name][attr_name] = attr_value
 
         remove = self.remove
         clean_data = data
