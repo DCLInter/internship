@@ -2,7 +2,7 @@
 local_paths.py
 *.h5
 Scripts/bp_lgbm/data_features/
-CV_results_group
+CV_results*
 configs
 mi_results
 shap_results

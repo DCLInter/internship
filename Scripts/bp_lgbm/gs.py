@@ -79,7 +79,7 @@ def run_grid_search(
             n_iter=n_iter,
             cv=cv,
             scoring=scoring,
-            n_jobs=-1,
+            n_jobs=n_jobs,
             verbose=verbose,
             random_state=42,
             return_train_score = True
