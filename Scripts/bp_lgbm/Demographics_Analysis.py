@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Features_complete_VitalDB_Train_Subset.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
     test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
 
     # =========================================================
@@ -47,10 +47,10 @@ if __name__ == "__main__":
     num_features = ["Age", "BMI", "Height", "Weight", "SBP", "DBP"]
     plots.plot_numeric_distributions(df_train, num_features, "Train")
     plots.plot_numeric_distributions(df_test, num_features, "Test")
-
+    """
     plots.plot_gender_distribution(df_train, "Train")
     plots.plot_gender_distribution(df_test, "Test")
-    """
+    
     thresholds = {
         "Age": [40, 60],
         "BMI": [18.5, 25],

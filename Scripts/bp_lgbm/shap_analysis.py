@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from sklearn.base import clone
 from sklearn.model_selection import GroupShuffleSplit
+from scipy import stats
 
 # ----------------------------
 # Computation
@@ -96,76 +97,70 @@ def rank_features_from_shap(shap_values, feature_names):
     ranking = np.argsort(-mean_abs_shap)  # descending order
     return ranking, mean_abs_shap
 
-def shap_rank_stability( # THIS FUNCTION NEEDS REFACTORING
+def shap_rank_stability(
     pipeline, 
     X, 
-    y,
-    groups, # The column where the patient Id are 
-    target_idx: int = None, 
+    y, 
+    groups,                 # subject IDs
     n_iter: int = 50, 
-    tol: float = 1.0, 
+    target_idx: int = None, 
     random_state: int = 42,
     verbose: bool = True,
-    save_path: str = None  # NEW: where to save results (directory or file prefix)
+    save_path: str = None
 ):
     """
-    Evaluate the stability of SHAP feature importance rankings and absolute values 
-    across multiple stochastic runs of a model (e.g., LightGBM inside a pipeline).
-
-    Tracks *per-feature* rank changes between iterations, so feature trajectories 
-    can be visualized directly.
+    Evaluate SHAP feature ranking stability using *preallocated subject splits*.
+    Splits are generated once with allocate_subjects_for_train, ensuring that
+    subject appearances in training are balanced based on inverse signal contribution.
 
     Parameters
     ----------
     pipeline : sklearn.Pipeline
-        Pipeline ending with an estimator compatible with TreeExplainer 
-        (e.g., LightGBM). The estimator must accept `random_state`.
+        Pipeline ending with an estimator compatible with shap.TreeExplainer.
     
-    X : pandas.DataFrame
-        Feature matrix. Must have column names.
+    X : pd.DataFrame
+        Feature matrix (with column names).
     
     y : array-like
         Target vector.
     
-    target_idx : int, optional (default=None)
-        If pipeline's final estimator is a MultiOutputRegressor, specify which 
-        target to explain (0=SBP, 1=DBP, 2=MAP).
+    groups : array-like
+        Subject IDs aligned with X/y.
     
-    n_iter : int, optional (default=50)
-        Maximum number of iterations.
+    n_iter : int, default=50
+        Number of iterations/splits to allocate and run.
     
-    tol : float, optional (default=1.0)
-        Convergence threshold for the average rank shift between iterations.
+    target_idx : int, optional
+        If using MultiOutputRegressor, specify which target to explain.
     
-    random_state : int, optional (default=42)
-        Base random seed. Each iteration increments this by +i for variability.
+    random_state : int, default=42
+        Seed for reproducibility in subject allocation.
     
-    verbose : bool, optional (default=True)
-        Print progress and stability information.
+    verbose : bool, default=True
+        Print progress info.
+    
     save_path : str, optional
-        If provided, saves results to CSV/NPZ files. 
-        Use as a prefix (e.g., "results/shap_sbp") and function will append suffixes.
+        If provided, saves matrices/summary to disk.
 
     Returns
     -------
-    avg_rank : np.ndarray of shape (n_features,)
+    avg_rank : np.ndarray
         Average rank of each feature across iterations.
-    
-    rank_matrix : np.ndarray of shape (n_iter_eff, n_features)
+    rank_matrix : np.ndarray
         Rank of each feature at each iteration.
-    
-    avg_abs_shap : np.ndarray of shape (n_features,)
-        Average mean(|SHAP|) across iterations for each feature.
-    
-    abs_shap_matrix : np.ndarray of shape (n_iter_eff, n_features)
-        Per-iteration mean(|SHAP|) for each feature.
-    
-    rank_diff_matrix : np.ndarray of shape (n_iter_eff-1, n_features)
-        Per-feature rank changes between consecutive iterations.
-    
-    feature_names : list of str
-        Feature names corresponding to columns of X.
+    avg_abs_shap : np.ndarray
+        Average mean(|SHAP|) across iterations.
+    abs_shap_matrix : np.ndarray
+        Mean(|SHAP|) per feature per iteration.
+    rank_diff_matrix : np.ndarray
+        Rank changes between consecutive iterations.
+    feature_names : list
+        List of feature names.
     """
+
+    # === Preallocate splits ===
+    splits = allocate_subjects_for_train(groups, n_iter=n_iter, train_size=0.8, random_state=random_state)
+
     feature_names = list(X.columns)
     n_features = X.shape[1]
 
@@ -173,28 +168,23 @@ def shap_rank_stability( # THIS FUNCTION NEEDS REFACTORING
     abs_shap_matrix = np.zeros((n_iter, n_features))
     rank_diff_matrix = np.zeros((n_iter - 1, n_features))
 
-    mask_train, mask_test = None, None
     prev_ranks = None
-    effective_iters = 0
 
-    for i in range(n_iter):
+    for i, split in enumerate(splits):
         if verbose:
             print(f"[Iteration {i+1}/{n_iter}]")
         iter_start = time.time()
 
-        # === SUBJECT-WISE SPLIT ===
-        mask_train, mask_test = get_train_test_masks(
-            X, y, groups, mask_train, mask_test, seed=random_state, iter_idx=i
-        )
+        # === Build masks ===
+        mask_train = np.isin(groups, split["train_subjects"]) # It is accessing the dicrtionary in the train set
         X_train, y_train = X[mask_train], np.array(y)[mask_train]
 
         # === Fit pipeline ===
         pipe = clone(pipeline)
-        # keep model's random_state fixed (no per-iteration changes!)
         pipe.fit(X_train, y_train)
-        estimator = pipe[-1]
+        estimator = pipe.named_steps["model"]  # explicit access to estimator
 
-        # === Compute SHAP ===
+        # === Compute SHAP on train set ===
         shap_values, _, feature_names = compute_shap_values(
             estimator, X_train, target_idx=target_idx, feature_names=feature_names, verbose=False
         )
@@ -205,46 +195,34 @@ def shap_rank_stability( # THIS FUNCTION NEEDS REFACTORING
             rank_matrix[i, feat_idx] = pos + 1
         abs_shap_matrix[i, :] = mean_abs_shap
 
-        # === Track stability ===
+        # === Rank differences ===
         if prev_ranks is not None:
-            rank_diff = np.abs(rank_matrix[i] - prev_ranks)
-            rank_diff_matrix[i - 1, :] = rank_diff
-            avg_shift = rank_diff.mean()
-            if verbose:
-                print(f"  Avg. rank shift = {avg_shift:.3f}")
-            if avg_shift < tol:
-                if verbose:
-                    print("  Converged — stopping early.")
-                effective_iters = i + 1
-                break
+            rank_diff_matrix[i - 1, :] = np.abs(rank_matrix[i] - prev_ranks)
 
         prev_ranks = rank_matrix[i].copy()
-        effective_iters = i + 1
 
         if verbose:
             elapsed = time.time() - iter_start
             print(f"  Iteration time: {elapsed:.2f} seconds")
 
-    # Truncate
-    rank_matrix = rank_matrix[:effective_iters]
-    abs_shap_matrix = abs_shap_matrix[:effective_iters]
-    rank_diff_matrix = rank_diff_matrix[:effective_iters - 1]
-
-    # Averages
+    # === Averages ===
     avg_rank = rank_matrix.mean(axis=0)
     avg_abs_shap = abs_shap_matrix.mean(axis=0)
 
-    # Optional save
+    # === Optional save ===
     if save_path is not None:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
         pd.DataFrame({
             "feature": feature_names,
             "avg_rank": avg_rank,
             "avg_abs_shap": avg_abs_shap
         }).to_csv(f"{save_path}_summary.csv", index=False)
+
         pd.DataFrame(rank_matrix, columns=feature_names).to_csv(f"{save_path}_rank_matrix.csv", index=False)
         pd.DataFrame(abs_shap_matrix, columns=feature_names).to_csv(f"{save_path}_abs_shap_matrix.csv", index=False)
         pd.DataFrame(rank_diff_matrix, columns=feature_names).to_csv(f"{save_path}_rank_diff_matrix.csv", index=False)
+
         if verbose:
             print(f"Results saved to: {os.path.dirname(save_path)}")
 
@@ -253,8 +231,7 @@ def shap_rank_stability( # THIS FUNCTION NEEDS REFACTORING
 # ----------------------------
 # Utilities
 # ----------------------------
-
-def get_train_test_masks(X, y, groups, mask_train=None, mask_test=None, seed=42, iter_idx=0):
+def get_train_test_masks(X, y, groups, mask_train=None, mask_test=None, seed=42, iter_idx=0): # Not really used.
     """
     Create subject-wise train/test masks for iteration.
 
@@ -293,6 +270,117 @@ def get_train_test_masks(X, y, groups, mask_train=None, mask_test=None, seed=42,
 
         return new_mask_train, new_mask_test
 
+def allocate_subjects_for_train(groups, n_iter=50, train_size=0.8, random_state=42):
+    """
+    Allocate subjects into n_iter training sets, balancing appearances
+    based on the inverse of their dataset contribution (signal counts).
+    
+    Parameters
+    ----------
+    groups : array-like of shape (n_samples,)
+        Subject IDs for each row of the dataset.
+    n_iter : int, default=50
+        Number of splits to allocate.
+    train_size : float, default=0.8
+        Proportion of subjects to assign to train set each split.
+    random_state : int, default=42
+        Random seed for reproducibility when shuffling assignments.
+
+    Returns
+    -------
+    splits : list of dict
+        List of length n_iter. Each entry is a dict with:
+            - "train_subjects": list of subject IDs
+            - "test_subjects": list of subject IDs
+    """
+    rng = np.random.RandomState(random_state)
+    unique_subjects, counts = np.unique(groups, return_counts=True)
+    N = len(unique_subjects)
+
+    # Contribution proportion per subject
+    contributions = counts / counts.sum()
+
+    # Inverse weights
+    inv_weights = 1.0 / contributions
+    probs = inv_weights / inv_weights.sum()
+
+    # Expected number of training slots across all iterations
+    total_train_slots = int(n_iter * train_size * N)
+    expected_train = probs * total_train_slots
+
+    # Round to integers
+    train_counts = np.floor(expected_train).astype(int)
+    remainder = total_train_slots - train_counts.sum()
+
+    # Distribute leftover slots (highest fractional parts get one extra slot)
+    frac_parts = expected_train - train_counts
+    extra_indices = np.argsort(-frac_parts)[:remainder]
+    train_counts[extra_indices] += 1
+
+    # === Allocate across iterations ===
+    # Build a "pool" of subject IDs repeated by their quota
+    pool = []
+    for subj, count in zip(unique_subjects, train_counts):
+        pool.extend([subj] * count)
+
+    rng.shuffle(pool)
+
+    splits = []
+    slot_size = int(train_size * N)  # train subjects per iteration
+    for i in range(n_iter):
+        start = i * slot_size
+        end = (i + 1) * slot_size
+        train_subjects = pool[start:end]
+
+        # Ensure uniqueness per iteration
+        train_subjects = list(set(train_subjects))
+        test_subjects = [s for s in unique_subjects if s not in train_subjects]
+
+        splits.append({
+            "train_subjects": train_subjects,
+            "test_subjects": test_subjects
+        })
+
+    return splits
+
+def summarize_rank_matrix(rank_matrix, feature_names, save_path=None):
+    """
+    Compute summary statistics for feature ranks across iterations.
+    
+    Parameters
+    ----------
+    rank_matrix : np.ndarray, shape (n_iter, n_features)
+        Rank of each feature at each iteration.
+    
+    feature_names : list of str
+        Names of the features.
+    
+    save_path : str, optional
+        If provided, saves the summary as CSV.
+    
+    Returns
+    -------
+    summary_df : pd.DataFrame
+        DataFrame with summary statistics for each feature.
+    """
+    # Convert to DataFrame
+    df = pd.DataFrame(rank_matrix, columns=feature_names)
+
+    summary = pd.DataFrame({
+        "feature": feature_names,
+        "mean": df.mean().values,
+        "median": df.median().values,
+        "std": df.std().values,
+        "min": df.min().values,
+        "max": df.max().values,
+        "iqr": (df.quantile(0.75) - df.quantile(0.25)).values,
+        "mode": [stats.mode(df[col], keepdims=True).mode[0] for col in df.columns]
+    })
+
+    if save_path is not None:
+        summary.to_csv(save_path, index=False)
+
+    return summary
 # ----------------------------
 # Visualization
 # ----------------------------
@@ -342,6 +430,105 @@ def plot_shap_beeswarm_summary(shap_values, X, feature_names=None, target_name="
         max_display=max_display
     )
     plt.title(title)
+
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+    elif show:
+        plt.show()
+
+def plot_rank_diff_trajectories(
+    rank_diff_matrix, 
+    feature_names, 
+    top_k=None, 
+    figsize=(12,6),
+    show=True,
+    save_path=None
+):
+    """
+    Plot trajectories of rank differences across iterations.
+
+    Parameters
+    ----------
+    rank_diff_matrix : np.ndarray, shape (n_iter-1, n_features)
+        Rank differences between consecutive iterations.
+    feature_names : list of str
+        Feature names.
+    top_k : int, optional
+        If given, plot only top_k features with highest average variability.
+    figsize : tuple
+        Figure size.
+    show : bool, default=True
+        If True, display the plot interactively.
+    save_path : str or Path, optional
+        If given, save the plot as PNG at this path.
+    """
+    n_iter = rank_diff_matrix.shape[0] + 1
+
+    # Compute average variability
+    avg_var = rank_diff_matrix.mean(axis=0)
+    order = np.argsort(-avg_var)
+    if top_k is not None:
+        selected = order[:top_k]
+    else:
+        selected = range(len(feature_names))
+
+    plt.figure(figsize=figsize)
+    for idx in selected:
+        plt.plot(range(2, n_iter+1), rank_diff_matrix[:, idx], label=feature_names[idx], alpha=0.7)
+
+    plt.xlabel("Iteration")
+    plt.ylabel("Rank difference vs previous iteration")
+    plt.title("Feature rank difference trajectories")
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+    elif show:
+        plt.show()
+
+def plot_rank_boxplot(
+    rank_matrix, 
+    feature_names, 
+    top_k=10, 
+    figsize=(10,6),
+    show=True,
+    save_path=None
+):
+    """
+    Plot horizontal boxplots of feature ranks across iterations.
+
+    Parameters
+    ----------
+    rank_matrix : np.ndarray, shape (n_iter, n_features)
+        Rank of each feature at each iteration.
+    feature_names : list of str
+        Feature names.
+    top_k : int, default=10
+        Number of top features (by average rank) to display.
+    figsize : tuple
+        Figure size.
+    show : bool, default=True
+        If True, display the plot interactively.
+    save_path : str or Path, optional
+        If given, save the plot as PNG at this path.
+    """
+    df = pd.DataFrame(rank_matrix, columns=feature_names)
+    avg_rank = df.mean().sort_values()  # lower = more important
+    top_features = avg_rank.head(top_k).index.tolist()
+
+    plt.figure(figsize=figsize)
+    df[top_features].boxplot(vert=False)
+    plt.title(f"Top {top_k} features: rank distributions across iterations")
+    plt.xlabel("Rank (lower = more important)")
+    plt.ylabel("Feature")
+    plt.tight_layout()
 
     if save_path is not None:
         save_path = Path(save_path)

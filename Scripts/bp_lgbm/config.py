@@ -9,7 +9,7 @@
 # Experiment Config
 # ----------------------------
 import json
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict, field, is_dataclass
 from pathlib import Path
 
 # ----------------------------
@@ -22,7 +22,7 @@ class ExperimentConfig:
     experiment_name: str = "baseline"
     verbose:int = -1
     model_params: dict = None
-    n_jobs = -1
+    n_jobs:int = -1
 
 # ----------------------------
 # Models Configs
@@ -57,19 +57,32 @@ lightGBM_best_guess_1 = {
     "bagging_freq": 1,       # resample every iteration
 }
 
-def save_config(cfg: ExperimentConfig, filepath: str):
+def save_config(cfg, filepath: str):
     """
     Save the current ExperimentConfig as a JSON file.
-
+    If model_params contains 'estimator__' keys, strip the prefix.
     Args:
         cfg: ExperimentConfig object
         filepath: where to save (e.g., "configs/baseline_tuned.json")
     """
-    data = asdict(cfg)  # convert dataclass to dictionary
+    # Convert dataclass to dict if needed
+    data = asdict(cfg) if is_dataclass(cfg) else dict(cfg)
+
+    # Clean up model_params
+    if "model_params" in data:
+        cleaned_params = {}
+        for k, v in data["model_params"].items():
+            if k.startswith("estimator__"):
+                new_key = k.replace("estimator__", "")
+                cleaned_params[new_key] = v
+            else:
+                cleaned_params[k] = v
+        data["model_params"] = cleaned_params
 
     # Ensure parent directory exists
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
+    # Save as JSON
     with open(filepath, "w") as f:
         json.dump(data, f, indent=4)
     print(f"✅ Config saved to {filepath}")
@@ -88,6 +101,7 @@ def load_config(filepath: str) -> ExperimentConfig:
     with open(filepath, "r") as f:
         data = json.load(f)
     return ExperimentConfig(**data)
+
 # ----------------------------
 # Param grids for GridSearch
 # ----------------------------

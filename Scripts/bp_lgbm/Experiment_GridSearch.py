@@ -33,8 +33,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    #train_original_path = Path(r"data_features") / "Features_complete_VitalDB_Train_Subset.h5"
-    # Local paths for GS
+    #train_original_path = Path(r"data_features") / "Features_VitalDB_Train_Subset.h5"
     train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
 
     # =========================================================
@@ -91,10 +90,10 @@ if __name__ == "__main__":
     # build the model
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
-                           experiment_name="Full_Grid_Randomized_search_3targets",
+                           experiment_name="SAMPLE_Full_Grid_Randomized_search_3targets",
                            verbose = -1,
                            model_params=lightGBM_default_params,
-                           n_jobs = 1)
+                           n_jobs=1)
     lgbm = build_lgbm(cfg)
     model = MultiOutputRegressor(lgbm)
 
@@ -114,12 +113,13 @@ if __name__ == "__main__":
                                             groups=groups,
                                             param_grid=lightGBM_full_grid_3target,
                                             n_splits=cfg.n_splits,
-                                            cv_type="group",
+                                            cv_type= "sample",
                                             save_results=True,
                                             verbose=-1,
                                             search_mode="random",
                                             n_iter=50,
-                                            scoring="neg_mean_squared_error"
+                                            scoring="neg_mean_squared_error",
+                                            n_jobs=-1
                                             )
     
     print("Best parameters:", search.best_params_)
