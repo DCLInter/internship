@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 class Metrics:
     def __init__(self, fiducials: pd.DataFrame, fs: int = 125, samples: int = 1125, thresholds: dict = {}):
@@ -21,12 +22,30 @@ class Metrics:
 
         return IPR, Tpp
     
+    def timeArrays(self):
+        ### We adquire the time between the fiducials (fp)
+        fp = self.fiducials.copy()
+        fd_t = fp/self.fs
+        fd_td = fd_t.diff().iloc[1:]
+        m = fd_td.mean(axis=0)
+
+        self.fiducials_times = fd_t
+        self.fiducials_tdiff = fd_td
+        self.mTFP = m
+
+        # for fp in self.fiducials.keys():
+        #     a = self.fiducials[fp]/self.fs
+        #     ### Checks if any of the fiducials wasnt detected
+        #     if (a.isna()).any():
+        #         continue
+
+        #     self.fiducials_times[fp] = np.array(a,dtype=float) ### The temporal position of the fp in seconds
+        #     self.fiducials_tdiff[fp] = np.round(np.diff(self.fiducials_times[fp]),6) ### time between the fp
+        #     self.mTFP[fp] = np.mean(self.fiducials_tdiff[fp])
+    
     def checkNA(self):
         flag = 0
-        for fp in self.fiducials.keys():
-            a = self.fiducials[fp]
-            if (a.isna()).any():
-                flag += len(np.where(a.isna()[0]))
+        flag = self.fiducials.isna().sum().sum()
         
         return flag
 
@@ -50,7 +69,7 @@ class Metrics:
 
         return flag
     
-    def checkOrder(self, dic_flags: dict, patient: str, signal):
+    def checkOrder(self, patient: str, signal):
         lppg = ["on","sp","dn","dp","off"]
         ld1 = ["u","v","w"]
         ld2 = ["a","b","c","d","e","f"]
@@ -61,9 +80,12 @@ class Metrics:
         winOverlap = {}
         flags = {}
         numPerDerivatives = {}
+        dic_flags = {}
         for listfp in l:
             fld = 0
             for fidu in listfp:
+                if fidu not in dic_flags:
+                    dic_flags[fidu] = []
                 ind = listfp.index(fidu)
                 p0 = self.fiducials[listfp[ind]]
                 p = self.fiducials[listfp[ind-1]] if ind > 0 else p0
@@ -72,7 +94,7 @@ class Metrics:
                 if (p0.isna()).any():
                     numFlagFidu += len(np.where(p0.isna())[0])
                     flags[fidu] = np.where(p0.isna())[0]
-                    dic_flags[patient][listfp[ind]].append(signal)
+                    dic_flags[listfp[ind]].append(signal)
                     continue
                 
                 if (p.isna()).any():
@@ -97,7 +119,7 @@ class Metrics:
                 if (pos == False).any():
                     fld += len(np.where(pos == False)[0])
                     numFlagFidu += len(np.where(pos == False)[0])
-                    dic_flags[patient][listfp[ind]].append(signal)
+                    dic_flags[listfp[ind]].append(signal)
                 else:
                     pass
             if listfp == lppg:
@@ -135,47 +157,39 @@ class Metrics:
 
         return flag
 
-    def timeArrays(self):
-        ### We adquire the time between the fiducials (fp)
-        self.fiducials_times = {}
-        self.fiducials_tdiff = {}
-        self.mTFP = {}
-        for fp in self.fiducials.keys():
-            a = self.fiducials[fp]/self.fs
-            ### Checks if any of the fiducials wasnt detected
-            if (a.isna()).any():
-                continue
-
-            self.fiducials_times[fp] = np.array(a,dtype=float) ### The temporal position of the fp in seconds
-            self.fiducials_tdiff[fp] = np.round(np.diff(self.fiducials_times[fp]),6) ### time between the fp
-            self.mTFP[fp] = np.mean(self.fiducials_tdiff[fp])
-
     def consistency_alignment(self):
-        self.alignment = {}
-        self.consistency = {}
-        for fp in self.fiducials_tdiff.keys():
-            n = len(self.fiducials_tdiff[fp])
-            alig = 1 - abs(self.fiducials_tdiff[fp] - self.Tpp)/self.Tpp
-            cons = 1 - abs(self.fiducials_tdiff[fp] - self.mTFP[fp])/self.mTFP[fp]
+        
+        fd_t = self.fiducials_tdiff.copy()
 
-            self.alignment[fp] = alig*100
-            self.consistency[fp] = cons*100
+        alig = abs(fd_t.sub(self.Tpp, axis=0))
+        alig = alig.div(self.Tpp, axis=0)
+        alignment = (1 - alig)*100
 
+        cons = abs(fd_t.sub(self.mTFP, axis=1))
+        cons = cons.div(self.mTFP, axis=1)
+        consistency = (1 - cons)*100
+
+        self.alignment = alignment
+        self.consistency = consistency
+        
         return self.alignment, self.consistency
     
     def scoreCombined(self):
+        
         if self.thresholds:
             w1 = self.thresholds["w_consistency"]
             w2 = self.thresholds["w_alignment"]
         else:
             w1 = 0.25
             w2 = 0.75
+        alig = self.alignment.copy()
+        cons = self.consistency.copy()
+        scCons = w1*cons
+        scAlig = w2*alig
 
-        self.scores = {}
-        for fp in self.alignment.keys():
-            score_alig_cons = (w1*(self.consistency[fp]) + w2*(self.alignment[fp]))
-            self.scores[fp] = score_alig_cons
-
+        scores = scAlig.add(scCons,axis=1)
+        self.scores = scores
+        
         return self.scores
     
 
