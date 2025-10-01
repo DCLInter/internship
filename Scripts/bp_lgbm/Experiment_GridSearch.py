@@ -115,7 +115,7 @@ if __name__ == "__main__":
                                             n_splits=cfg.n_splits,
                                             cv_type= "sample",
                                             save_results=True,
-                                            verbose=0,
+                                            verbose=-1,
                                             search_mode="random",
                                             n_iter=50,
                                             scoring="neg_mean_squared_error",
