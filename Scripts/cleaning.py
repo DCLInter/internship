@@ -81,8 +81,16 @@ class Cleaner:
         self.clean_data = clean_data
 
         return clean_data
+    
+    def clean_dataset(self, dataset: pd.DataFrame, ids_remove):
+        print("Cleaning process:")
+        
+        target = dataset.index.isin(ids_remove)
+        target = pd.Series(target,index=dataset.index)
+        clean_dataset = dataset.loc[~target]
 
-
+        return clean_dataset
+    
     def saveh5(self,filename):
         print("Saving in: ",filename)
         data = self.clean_data
