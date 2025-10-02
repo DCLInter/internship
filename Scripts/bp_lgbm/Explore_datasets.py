@@ -10,7 +10,7 @@ from h5_inspector import inspect_file
 from pathlib import Path
 from data import load_PulseDB_sup_ds
 
-test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
+test_original_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset.h5"
 
 inspect_file(test_original_path, show_attrs=True)
 """

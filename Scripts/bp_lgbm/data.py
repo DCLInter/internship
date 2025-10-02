@@ -291,7 +291,7 @@ def load_PulseDB_sup_ds(
         }
 
         # Load and transpose PPG features (28, N) → (N, 28)
-        ppg_arr = np.array(f["PPG_features"]["Features"]).T
+        ppg_arr = np.array(f["PPG_Features"]).T
 
         # Assign names
         if feature_names is None:
