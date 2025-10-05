@@ -5,7 +5,6 @@
 ###############################################################
 import preprocessing
 import eval
-import shap_analysis
 from pathlib import Path
 from local_paths import PULSE_DB_SUP_DIR, PERFORMANCE_RESULTS_PAPER, GS_RESULT_PAPER
 from data import load_PulseDB_sup_ds
@@ -24,9 +23,8 @@ if __name__ == "__main__":
     test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
     
     train_clean_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset.h5"
-    """
-    test_clean_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_CalFree_Test_Subset.h5"
-    """
+    #test_clean_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_CalFree_Test_Subset.h5"
+    
     # =========================================================
     # Load Data
     #==========================================================
@@ -84,14 +82,19 @@ if __name__ == "__main__":
 
     # Splittin sample wise
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True)#, stratify=X_train["Subject"]) # Cant stratify in the cleaned as dataset is quite imbalanced
-    
+    """
     counts = X_val["Subject"].value_counts()
     print(counts)
-    
+    """
+    #-----------------------------------------
+    # Just for diagnosing the model
+    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True)#, stratify=X_train["Subject"])
+    #-----------------------------------------
 
     X_train = X_train.drop(columns=["Subject"])
     X_val = X_val.drop(columns=["Subject"])
     X_test = X_test.drop(columns=["Subject"])
+    X_sub_train = X_sub_train.drop(columns=["Subject"])
 
     # build the model
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
@@ -103,7 +106,7 @@ if __name__ == "__main__":
         ("scaler", StandardScaler()),
         ("model", lgbm)
     ])
-
+    
     # =========================================================
     # Training and Eval
     #==========================================================
@@ -111,6 +114,7 @@ if __name__ == "__main__":
         Y_tr = Y_train[target]
         Y_v = Y_val[target]
         Y_t = Y_test[target]
+        Y_tr_sub = Y_sub_train[target]
 
         # Train
         pipeline.fit(X_train, Y_tr)                               
@@ -118,23 +122,33 @@ if __name__ == "__main__":
         # Pred
         Y_val_pred = pipeline.predict(X_val)
         Y_pred = pipeline.predict(X_test)
-        # Eval
-        Bland_Altman_Path = PERFORMANCE_RESULTS_PAPER / r"Ideal_Case/BA"
-        R2_path = PERFORMANCE_RESULTS_PAPER / r"Ideal_Case/R2"
-        res_path = PERFORMANCE_RESULTS_PAPER / r"Ideal_Case/Performance"
-        metrics_val_original = eval.evaluate(Y_v, Y_val_pred, 
-                                             BA_path=Bland_Altman_Path / f"val_clean_{target}.png",
-                                             R2_path= R2_path / f"val_clean_{target}.png",
-                                             save_results=res_path/ f"val_clean_{target}.csv")
-        metrics_test_original = eval.evaluate(Y_t, Y_pred, 
-                                              BA_path=Bland_Altman_Path / f"test_clean_{target}.png",
-                                              R2_path= R2_path / f"test_original_{target}.png",
-                                              save_results=res_path/ f"test_clean_{target}.csv")
+        Y_tr_sub_pred = pipeline.predict(X_sub_train)
 
+        # Eval
+        Bland_Altman_Path = PERFORMANCE_RESULTS_PAPER / r"Training_Baseline/BA"
+        R2_path = PERFORMANCE_RESULTS_PAPER / r"Training_Baseline/R2"
+        res_path = PERFORMANCE_RESULTS_PAPER / r"Training_Baseline/Performance"
+        metrics_train_original = eval.evaluate(Y_tr_sub, Y_tr_sub_pred, 
+                                             BA_path=Bland_Altman_Path / f"train_subset_clean_{target}.png",
+                                             R2_path= R2_path / f"train_subset_clean_{target}.png",
+                                             save_results=res_path/ f"train_subset_clean_{target}.csv")
+        """
+        metrics_val_original = eval.evaluate(Y_v, Y_val_pred, 
+                                             BA_path=Bland_Altman_Path / f"val_original_{target}.png",
+                                             R2_path= R2_path / f"val_original_{target}.png",
+                                             save_results=res_path/ f"val_original_{target}.csv")
+        metrics_test_original = eval.evaluate(Y_t, Y_pred, 
+                                              BA_path=Bland_Altman_Path / f"train_original_test_original_{target}.png",
+                                              R2_path= R2_path / f"train_original_test_original_{target}.png",
+                                              save_results=res_path/ f"train_original_test_original_{target}.csv")
+        """
+        print(f"=== Results for {target}, in TRAIN ===")
+        print(metrics_train_original)
+        """
         print(f"=== Results for {target}, in VAL ===")
         print(metrics_val_original)
         
         print(f"=== Results for {target}, in TEST ===")
         print(metrics_test_original)
-        
+        """
         

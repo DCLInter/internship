@@ -25,7 +25,7 @@ def convert_h5_structure(old_path: str, new_path: str):
 
 
 if __name__ == "__main__":
-    old_file = Path(r"C:\Users\addp972\OneDrive - City, University of London\3.PhD\9. Experiments\PulseDB\SupplementarySubsets\Features_VitalDB_CalFree_Test_Subset.h5")
-    new_file = Path(r"C:\Users\addp972\OneDrive - City, University of London\3.PhD\9. Experiments\PulseDB\SupplementarySubsets\Features_VitalDB_CalFree_Test_Subset_converted.h5")
+    old_file = Path(r"C:\Users\Felipe Saldarriaga\OneDrive - City, University of London\3.PhD\9. Experiments\PulseDB\SupplementarySubsets\Clean_Features_VitalDB_CalFree_Test_Subset.h5")
+    new_file = Path(r"C:\Users\Felipe Saldarriaga\OneDrive - City, University of London\3.PhD\9. Experiments\PulseDB\SupplementarySubsets\Clean_Features_VitalDB_CalFree_Test_Subset_converted.h5")
 
     convert_h5_structure(old_file, new_file)
