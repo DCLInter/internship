@@ -17,6 +17,7 @@ Commun Med 4, 140 (2024). https://doi.org/10.1038/s43856-024-00555-2
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from typing import Dict, Tuple
 from pathlib import Path
@@ -48,8 +49,8 @@ def bland_altman_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "bland
     plt.axhline(loa_high, color="red", linestyle=":", linewidth=2, label=f"LoA high = {loa_high:.2f}")
 
     # Labels with formulas in parentheses
-    plt.xlabel("Mean of prediction and reference ( (ŷ + y) / 2 )", fontsize=12, weight="bold")
-    plt.ylabel("Prediction − Reference ( ŷ − y )", fontsize=12, weight="bold")
+    plt.xlabel("Mean of prediction and reference ( (ŷ + y) / 2 )", fontsize=12)
+    plt.ylabel("Prediction − Reference ( ŷ − y )", fontsize=12)
 
     # Title larger and bold
     plt.title("Bland–Altman Plot", fontsize=16, weight="bold")
@@ -70,8 +71,54 @@ def bland_altman_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "bland
         "plot_path": path,
     }
 
+def r2_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "r2_plot.png"):
+    """
+    Scatter plot of predicted vs. true values with R² score.
+    Adds continuous identity line, shaded dispersion band, and saves to file.
+    """
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray, path: str) -> Dict[str, float]:
+    r2 = r2_score(y_true, y_pred)
+
+    # Compute spread (std of residuals)
+    residuals = y_pred - y_true
+    spread = np.std(residuals, ddof=1)
+
+    plt.figure(figsize=(7, 6), dpi=140)
+    plt.scatter(y_true, y_pred, alpha=0.4, s=12, color="steelblue", edgecolor="none")
+
+    # Common limits
+    min_val = min(y_true.min(), y_pred.min())
+    max_val = max(y_true.max(), y_pred.max())
+    x_vals = np.linspace(min_val, max_val, 100)
+
+    # Identity line (continuous black)
+    plt.plot(x_vals, x_vals, "k-", linewidth=2, label="Identity (y = x)")
+
+    # Shadow band ±1 SD of residuals
+    plt.fill_between(x_vals, x_vals - spread, x_vals + spread,
+                     color="gray", alpha=0.2, label=f"±1 SD ({spread:.2f})")
+
+    # Enforce square axes
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+
+    # Labels (not bold)
+    plt.xlabel("True values (y)", fontsize=12)
+    plt.ylabel("Predicted values (ŷ)", fontsize=12)
+    plt.title("Predicted vs True", fontsize=16, weight="bold")
+
+    # Grid and legend
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend([f"R² = {r2:.3f}", f"±1 SD = {spread:.2f}"], loc="best", frameon=True, fontsize=10)
+
+    plt.tight_layout()
+    plt.savefig(path, bbox_inches="tight")
+    plt.close()
+
+    return r2
+
+
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str, save_results: str = None) -> Dict[str, float]:
     """
     Compute requested metrics:
     - MAE (+SD of |error|)
@@ -94,9 +141,9 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray, path: str) -> Dict[str, flo
     mse = mean_squared_error(y_true, y_pred)
     rmse = float(np.sqrt(mse))
 
-    r2 = r2_score(y_true, y_pred)
+    r2 = r2_plot(y_true, y_pred, path=Path(R2_path))
 
-    ba_stats = bland_altman_plot(y_true, y_pred, path=Path(path))
+    ba_stats = bland_altman_plot(y_true, y_pred, path=Path(BA_path))
 
     metrics = {
         "MAE": float(mae),
@@ -117,4 +164,9 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray, path: str) -> Dict[str, flo
         "BA_loa_high": ba_stats["loa_high"],
         "BA_plot_path": ba_stats["plot_path"],
     }
+
+    # --- Optional: save to CSV ---
+    if save_results is not None:
+        pd.DataFrame([metrics]).to_csv(Path(save_results), index=False)
+
     return metrics

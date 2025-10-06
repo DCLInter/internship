@@ -8,7 +8,7 @@
 import preprocessing
 import eval
 from pathlib import Path
-from local_paths import PULSE_DB_SUP_DIR
+from local_paths import PULSE_DB_SUP_DIR, PERFORMANCE_RESULTS_PAPER
 from data import load_PulseDB_sup_ds
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Features_complete_VitalDB_Train_Subset.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
     test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
 
     # =========================================================
@@ -37,8 +37,8 @@ if __name__ == "__main__":
     df_train = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
     df_test = load_PulseDB_sup_ds(test_original_path, feature_names=feature_names)
     
-    print(df_train.head())
-    print(df_test.head())
+    print(df_train.info())
+    print(df_test.info())
 
     # =========================================================
     # Check NaNs and fill them
@@ -82,34 +82,48 @@ if __name__ == "__main__":
     demographics_col = ["Subject", "Age", "Gender", "Height", "Weight", "BMI"]
     targets = ["SBP", "DBP", "MAP"]
     X_train = df_train[demographics_col]
-
     X_test = df_test[demographics_col]
-    print(X_train.head())
-
-    Y_train = df_train[targets[1]]
-    Y_test = df_test[targets[1]]
-    print(Y_train.head())
+    Y_train = df_train[targets]
+    Y_test = df_test[targets]
 
     # --- Train/test split ---
     X_train, X_val, Y_train, Y_val = train_test_split(
-        X_train, Y_train, test_size=0.2, random_state=42, shuffle=True, stratify=X_train["Subject"]
+        X_train, Y_train, test_size=0.1, random_state=42, shuffle=True, stratify=X_train["Subject"]
     )
 
-    # --- Fit model ---
-    model.fit(X_train, Y_train)
-
-    # --- Predict ---
-    Y_pred_val = model.predict(X_val)
-    Y_pred_test = model.predict(X_test)
-
+    X_train = X_train.drop(columns=["Subject"])
+    X_test = X_test.drop(columns=["Subject"])
+    X_val = X_val.drop(columns=["Subject"])
     # =========================================================
     # Training and Eval
     #==========================================================
-    Bland_Altman_Path = Path(r"C:\Users\addp972\OneDrive - City, University of London\3.PhD\9. Experiments\2.LightGBM_SHAP\ICASSP_Submission\Bland_Altman")
-    metrics_eval = eval.evaluate(Y_val, Y_pred_val, Bland_Altman_Path /f"val_original_{targets[1]}_baseline.png")
-    metrics_test = eval.evaluate(Y_test, Y_pred_test, Bland_Altman_Path /f"test_original_{targets[1]}_baseline.png")
-    
-    print("***************** VALIDATION ***********************")
-    pprint(metrics_eval, sort_dicts=False)
-    print("***************** TESTING **************************")
-    pprint(metrics_test, sort_dicts=False)
+    for target in targets:
+        Y_tr = Y_train[target]
+        Y_v = Y_val[target]
+        Y_t = Y_test[target]
+
+        # --- Fit model ---
+        model.fit(X_train, Y_tr)
+
+        # --- Predict ---
+        Y_pred_val = model.predict(X_val)
+        Y_pred_test = model.predict(X_test)
+
+        Bland_Altman_Path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/BA"
+        R2_path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/R2"
+        res_path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/Performance"
+        print(Y_v.shape, Y_pred_val.shape)
+        metrics_val_original = eval.evaluate(Y_v, Y_pred_val, 
+                                                BA_path=Bland_Altman_Path / f"val_baseline_{target}.png",
+                                                R2_path= R2_path / f"val_clean_{target}.png",
+                                                save_results=res_path/ f"val_clean_{target}.csv")
+        metrics_test_original = eval.evaluate(Y_t, Y_pred_test, 
+                                                BA_path=Bland_Altman_Path / f"test_baseline_{target}.png",
+                                                R2_path= R2_path / f"test_baseline_{target}.png",
+                                                save_results=res_path/ f"test_baseline_{target}.csv")
+
+        print(f"=== Results for {target}, in VAL ===")
+        print(metrics_val_original)
+        
+        print(f"=== Results for {target}, in TEST ===")
+        print(metrics_test_original)

@@ -11,45 +11,36 @@ For the iterative process for the feature ranking is borrowed from:
 """
 
 import numpy as np
-import local_paths
 import preprocessing
-import cv
-import gs
-import mutual_information as mi
 import shap_analysis as sa
-from data import load_patient_dataset, load_group_attributes
+from local_paths import PULSE_DB_SUP_DIR
+from data import load_PulseDB_sup_ds
 from models import build_lgbm
 from config import ExperimentConfig, lightGBM_best_guess_1
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.metrics import mean_squared_error as mse
 from pathlib import Path
-from h5_inspector import inspect_file
 
 if __name__ == "__main__":
 
     # =========================================================
     # Paths
     #==========================================================
-    data_path_cleaned = local_paths.DATA_DIR /"features_patients_clean.h5"
-    labels_path = local_paths.LABELS_DIR / "BP_values.h5"
-    data_messy_path = local_paths.DATA_DIR /"features_patients.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
+    test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
 
     # =========================================================
     # Load Data
     #==========================================================
-    """
-    inspect_file(data_messy_path, show_attrs=True)
-    inspect_file(labels_path, show_attrs=True)
-    """
-
-    df_feat_orig_mean = load_patient_dataset(data_messy_path, dataset_type="mean")
-    labels_original_df = load_patient_dataset(file_path=labels_path, column_names=["segment_ID","SBP", "DBP", "MAP"])
-
-    df_feat_cleaned_mean = load_patient_dataset(data_path_cleaned, dataset_type="mean")
-    print(df_feat_cleaned_mean.head())
-    print(labels_original_df.head())
+    feature_names = ["IPR", "Tsp", "TWRRF25", "TWRRF50", "Tsw25", 
+                 "Tsw50", "Tsw75", "Tdw25", "Tdw50", "Tdw75", 
+                 "AUCpi", "IPA",  "Av-Au_ratio", "Ab-Aa_ratio", "Ac-Aa_ratio", 
+                 "Ad-Aa_ratio", "Ap2-Ap1_ratio", "AGI", "Kurtosis", "Skewness", 
+                 "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
+                 "FullSkew", "sdPRV", "IQR_PRV"]
+    df_train = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
+    df_test = load_PulseDB_sup_ds(test_original_path, feature_names=feature_names)
+    
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
@@ -60,58 +51,25 @@ if __name__ == "__main__":
     
     # Check if any NaN at all
     print("Is there any NaN in: df_features_mean?")
-    print(df_feat_cleaned_mean.isna().any().any())
+    print(df_test.isna().any().any())
     # Count total number of NaNs
-    print(df_feat_cleaned_mean.isna().sum())
+    print(df_test.isna().sum())
     """
-
-    # Note: ONLY THE ORGINAL FEATURE DATASET HAS NaNs
     # Fill X NaNs
-    X_df_original_feat = preprocessing.median_impute_patientwise(df_feat_orig_mean)
-    print("Checking NaN after inputation in X:", X_df_original_feat.isna().any().any())
-
-    # Fill Y NaNs
-    Y_df_original_feat = preprocessing.fill_missing_bp(labels_original_df)
-
-    # =========================================================
-    # Solving Macheetazos
-    #==========================================================
-    uncommon = preprocessing.find_uncommon_rows(X_df_original_feat, df_feat_cleaned_mean)
-
-    # =========================================================
-    # X and Y dfs merging
-    #==========================================================
-    XY_df_original = preprocessing.merge_XY(X_df_original_feat, Y_df_original_feat) # When possible, add the parmeter "on: Segements_ID"
-    XY_df_original = preprocessing.reset_segment_ids(XY_df_original, patient_col="Patient", segment_col="segment_ID")
-
-    # =========================================================
-    # Splitting into X and Y
-    #==========================================================
-    X_df_t_orig, Y_df_t_orig = preprocessing.split_XY(XY_df_original,
-                                                    target_cols= ["SBP", "DBP", "MAP"],
-                                                    id_cols= ["Patient", "segment_ID"]
-                                                    )
-    # =========================================================
-    # Solving Machetazos 2.0
-    #==========================================================
-    X_df_t_clean = preprocessing.align_segment_ids(X_df_t_orig, df_feat_cleaned_mean, seg_col="segment_ID")
-    uncommon = preprocessing.align_segment_ids(X_df_t_orig, uncommon, seg_col="segment_ID")
-    print(uncommon.head())
-
-    # Dropping the labels
-    Y_df_t_clean = preprocessing.drop_rows_by_keys(Y_df_t_orig, uncommon, keys = ["Patient", "segment_ID"])
-
+    df_train = preprocessing.median_impute_patientwise(df_train, patient_col= "Subject")
+    df_test = preprocessing.median_impute_patientwise(df_test, patient_col= "Subject")
     """
-    # Check the length of the datasets
-    print(X_df_t_clean.info())
-    print(Y_df_t_clean.info())
-    XY_df_clean = preprocessing.merge_XY(X_df_t_clean, Y_df_t_clean, on=["Patient", "segment_ID"])
-    print(XY_df_clean.info())
+    print(df_test.isna().any().any())
     """
-    
+
     # =========================================================
     # Initialize model
     #==========================================================
+    print(df_train.info())
+    df_train = preprocessing.downsample_per_patient(df_train, patient_col="Subject", proportion = 0.1)
+    print(df_train.info())
+    
+    """
     # build the model
     cfg = ExperimentConfig(n_splits=5, # it is not used in shap
                            random_state=42, 
@@ -130,7 +88,7 @@ if __name__ == "__main__":
     # Shapley Analysis
     #==========================================================
     #~~~~~~~~~~ Testing pipeline only ~~~~~~~~~~~~~~~~~~~~~~~~
-    """
+    
     # Count signals per patient
     counts = XY_df_original.groupby("Patient").size()
 
@@ -144,7 +102,6 @@ if __name__ == "__main__":
                                                     target_cols= ["SBP", "DBP", "MAP"],
                                                     id_cols= ["Patient", "segment_ID"]
                                                     )
-    """
     #Dropping strg columns
     id_cols = ["Patient", "segment_ID"]
     groups = X_df_t_orig["Patient"]
@@ -160,4 +117,5 @@ if __name__ == "__main__":
                                                                                                                    n_iter=50, 
                                                                                                                    save_path=Path(f"shap_results/test/{targets[0]}"))
     print("end")
+    """
     
