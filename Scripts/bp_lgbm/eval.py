@@ -118,7 +118,7 @@ def r2_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "r2_plot.png"):
     return r2
 
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str, save_results: str = None) -> Dict[str, float]:
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str) -> Dict[str, float]:
     """
     Compute requested metrics:
     - MAE (+SD of |error|)
@@ -165,8 +165,26 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str,
         "BA_plot_path": ba_stats["plot_path"],
     }
 
-    # --- Optional: save to CSV ---
-    if save_results is not None:
-        pd.DataFrame([metrics]).to_csv(Path(save_results), index=False)
-
     return metrics
+
+def save_results_dict(res_dict: dict, save_path: str, subset_col: str = "subset"):
+    """
+    Convert a dictionary of dictionaries into a DataFrame and save as CSV.
+
+    Args:
+        res_dict (dict): e.g., {"val": val_dict, "test": test_dict, ...}
+        save_path (str): path to save the resulting CSV
+        subset_col (str): name of the column for the outer dictionary keys (default="subset")
+    """
+    # Convert nested dict into a DataFrame
+    df = pd.DataFrame.from_dict(res_dict, orient="index")
+
+    # Add a column with the subset/experiment name
+    df.reset_index(inplace=True)
+    df.rename(columns={"index": subset_col}, inplace=True)
+
+    # Save to CSV
+    df.to_csv(save_path, index=False)
+
+    print(f"✅ Results saved to {save_path}")
+    return df

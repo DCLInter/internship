@@ -112,6 +112,7 @@ def shap_rank_stability(
     Evaluate SHAP feature ranking stability using *preallocated subject splits*.
     Splits are generated once with allocate_subjects_for_train, ensuring that
     subject appearances in training are balanced based on inverse signal contribution.
+    The splitting is done subject-wise
 
     Parameters
     ----------
@@ -152,6 +153,10 @@ def shap_rank_stability(
         Average mean(|SHAP|) across iterations.
     abs_shap_matrix : np.ndarray
         Mean(|SHAP|) per feature per iteration.
+    avg_raw_shap : np.ndarray
+        Average mean(SHAP) across iterations (signed).
+    raw_shap_matrix : np.ndarray
+        Mean(SHAP) per feature per iteration (signed).
     rank_diff_matrix : np.ndarray
         Rank changes between consecutive iterations.
     feature_names : list
@@ -166,6 +171,7 @@ def shap_rank_stability(
 
     rank_matrix = np.zeros((n_iter, n_features))
     abs_shap_matrix = np.zeros((n_iter, n_features))
+    raw_shap_matrix = np.zeros((n_iter, n_features))
     rank_diff_matrix = np.zeros((n_iter - 1, n_features))
 
     prev_ranks = None
@@ -189,11 +195,15 @@ def shap_rank_stability(
             estimator, X_train, target_idx=target_idx, feature_names=feature_names, verbose=False
         )
 
+         # shap_values shape: (n_samples, n_features)
+        mean_raw_shap = shap_values.mean(axis=0)
+
         # === Rank features ===
         ranks, mean_abs_shap = rank_features_from_shap(shap_values, feature_names)
         for pos, feat_idx in enumerate(ranks):
             rank_matrix[i, feat_idx] = pos + 1
         abs_shap_matrix[i, :] = mean_abs_shap
+        raw_shap_matrix[i, :] = mean_raw_shap
 
         # === Rank differences ===
         if prev_ranks is not None:
@@ -208,6 +218,7 @@ def shap_rank_stability(
     # === Averages ===
     avg_rank = rank_matrix.mean(axis=0)
     avg_abs_shap = abs_shap_matrix.mean(axis=0)
+    avg_raw_shap = raw_shap_matrix.mean(axis=0)
 
     # === Optional save ===
     if save_path is not None:
@@ -216,17 +227,19 @@ def shap_rank_stability(
         pd.DataFrame({
             "feature": feature_names,
             "avg_rank": avg_rank,
-            "avg_abs_shap": avg_abs_shap
+            "avg_abs_shap": avg_abs_shap,
+            "avg_raw_shap": avg_raw_shap
         }).to_csv(f"{save_path}_summary.csv", index=False)
 
         pd.DataFrame(rank_matrix, columns=feature_names).to_csv(f"{save_path}_rank_matrix.csv", index=False)
         pd.DataFrame(abs_shap_matrix, columns=feature_names).to_csv(f"{save_path}_abs_shap_matrix.csv", index=False)
+        pd.DataFrame(raw_shap_matrix, columns=feature_names).to_csv(f"{save_path}_raw_shap_matrix.csv", index=False)
         pd.DataFrame(rank_diff_matrix, columns=feature_names).to_csv(f"{save_path}_rank_diff_matrix.csv", index=False)
 
         if verbose:
             print(f"Results saved to: {os.path.dirname(save_path)}")
 
-    return avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, rank_diff_matrix, feature_names
+    return avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, avg_raw_shap, raw_shap_matrix, rank_diff_matrix, feature_names
 
 # ----------------------------
 # Utilities
@@ -485,14 +498,14 @@ def plot_rank_diff_trajectories(
     plt.legend()
     plt.tight_layout()
 
-    if save_path is not None:
+    if show:
+        plt.show()
+    elif save_path is not None:
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
-    elif show:
-        plt.show()
-
+"""
 def plot_rank_boxplot(
     rank_matrix, 
     feature_names, 
@@ -501,7 +514,7 @@ def plot_rank_boxplot(
     show=True,
     save_path=None
 ):
-    """
+    
     Plot horizontal boxplots of feature ranks across iterations.
 
     Parameters
@@ -518,9 +531,9 @@ def plot_rank_boxplot(
         If True, display the plot interactively.
     save_path : str or Path, optional
         If given, save the plot as PNG at this path.
-    """
+    
     df = pd.DataFrame(rank_matrix, columns=feature_names)
-    avg_rank = df.mean().sort_values()  # lower = more important
+    avg_rank = df.mean().sort_values(ascending=True)  # lower = more important
     top_features = avg_rank.head(top_k).index.tolist()
 
     plt.figure(figsize=figsize)
@@ -530,10 +543,136 @@ def plot_rank_boxplot(
     plt.ylabel("Feature")
     plt.tight_layout()
 
-    if save_path is not None:
+    if show:
+        plt.show()
+    elif save_path is not None:
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
-    elif show:
+"""
+def plot_rank_boxplot(
+    rank_matrix,
+    feature_names,
+    top_k=10,
+    figsize=(10,6),
+    show=True,
+    save_path=None,
+    sort_by="mean",        # "mean", "median", or "hybrid"
+    alpha=0.5             # weight for std in hybrid metric
+):
+    """
+    Plot horizontal boxplots of feature ranks across iterations.
+    Includes mean markers and flexible sorting criteria.
+
+    Plot horizontal boxplots of feature ranks across iterations.
+
+    Parameters
+    ----------
+    rank_matrix : np.ndarray, shape (n_iter, n_features)
+        Rank of each feature at each iteration.
+    feature_names : list of str
+        Feature names.
+    top_k : int, default=10
+        Number of top features (by average rank) to display.
+    figsize : tuple
+        Figure size.
+    show : bool, default=True
+        If True, display the plot interactively.
+    save_path : str or Path, optional
+        If given, save the plot as PNG at this path.
+    sort_by: str
+        The criteria by which the features are ranked
+    alpha: float
+        Coefficient for the weighted hybrid metric --> mean + alpha*std
+    """
+
+    df = pd.DataFrame(rank_matrix, columns=feature_names)
+
+    # --- Compute sorting metrics ---
+    mean_vals = df.mean()
+    median_vals = df.median()
+    std_vals = df.std()
+
+    if sort_by == "median":
+        sort_score = median_vals
+        sort_label = "median rank"
+    elif sort_by == "hybrid":
+        sort_score = mean_vals + alpha * std_vals
+        sort_label = f"hybrid score (mean + {alpha}·std)"
+    else:
+        sort_score = mean_vals
+        sort_label = "mean rank"
+
+    # --- Select top features ---
+    sorted_features = sort_score.sort_values(ascending=True).head(top_k).index.tolist()
+    sorted_features = sorted_features[::-1]  # reverse for top at top of plot
+
+    # --- Plot boxplots ---
+    plt.figure(figsize=figsize)
+    box = df[sorted_features].boxplot(vert=False, return_type="dict")
+
+    # --- Overlay mean markers ---
+    for i, feature in enumerate(sorted_features, 1):
+        mean_val = mean_vals[feature]
+        plt.plot(mean_val, i, "o", color="red", markersize=5)
+
+    plt.title(f"Top {top_k} features ({sort_label})")
+    plt.xlabel("Rank (lower = more important)")
+    plt.ylabel("Feature")
+    plt.tight_layout()
+
+    # --- Save or show ---
+    if show:
         plt.show()
+    elif save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+
+def plot_mean_std_scatter(
+    rank_matrix,
+    feature_names,
+    figsize=(8,6),
+    top_k_labels=10,
+    show=True,
+    save_path=None
+):
+    """
+    Scatter plot of mean rank (importance) vs. std rank (stability).
+
+    Parameters
+    ----------
+    rank_matrix : np.ndarray
+        Rank matrix [n_iter, n_features]
+    feature_names : list of str
+        Feature names
+    top_k_labels : int
+        Number of top features (lowest mean) to label
+    """
+    df = pd.DataFrame(rank_matrix, columns=feature_names)
+    mean_vals = df.mean()
+    std_vals = df.std()
+
+    plt.figure(figsize=figsize)
+    plt.scatter(mean_vals, std_vals, alpha=0.8)
+    plt.xlabel("Mean Rank (lower = more important)")
+    plt.ylabel("Rank Std (lower = more stable)")
+    plt.title("Feature Importance–Stability Trade-off")
+    plt.grid(alpha=0.3)
+
+    # Annotate top-k important features
+    top_features = mean_vals.sort_values().head(top_k_labels).index
+    for feat in top_features:
+        plt.text(mean_vals[feat], std_vals[feat], feat, fontsize=8, ha="right")
+
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    elif save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
