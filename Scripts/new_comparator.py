@@ -4,7 +4,7 @@ import pandas as pd
 from comparator import Comparator
 
 path_features = "D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_Train_Subset.h5"
-path_cleaned = "D:/U/Practicas_City_University_of_London/Data/Clean_Features_VitalDB_Train_Subset.h5"
+path_cleaned = "D:/U/Practicas_City_University_of_London/Data/Clean_Features_VitalDB_Train_Subset_80.h5"
 filepath_results = "D:/U/Practicas_City_University_of_London/Data"
 data = {}
 with h5py.File(path_features, 'r') as f:

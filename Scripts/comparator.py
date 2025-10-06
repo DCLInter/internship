@@ -234,7 +234,6 @@ class Comparator:
             for p in data.keys():
                 idx_ft = search_feat(ft,ft_names)
                 x = data[p][idx_ft]
-                print("X",x)
                 y = data_clean[p][idx_ft]
 
                 if x.size == 0 or y.size == 0:
