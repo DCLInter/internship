@@ -63,8 +63,9 @@ if __name__ == "__main__":
     # =========================================================
     # Initialize model
     #==========================================================
-    """
+    
     print(df_train.info())
+    """
     df_train = preprocessing.downsample_per_patient(df_train, patient_col="Subject", proportion = 0.1)
     print(df_train.info())
     """
@@ -101,7 +102,7 @@ if __name__ == "__main__":
                                                                                                                     X_train, 
                                                                                                                     Y_train,
                                                                                                                     groups = groups, 
-                                                                                                                    n_iter=20, 
+                                                                                                                    n_iter=30, 
                                                                                                                     save_path=Shap_path/f"{target}")
         end = time.time()
         print(f"Execution time: {end - start:.3f} seconds")
