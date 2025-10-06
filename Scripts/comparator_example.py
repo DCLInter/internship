@@ -1,7 +1,7 @@
 import h5py
 import numpy as np
 import pandas as pd
-from Scripts.comparator import Comparator
+from comparator import Comparator
 
 data = {}
 data_clean = {}

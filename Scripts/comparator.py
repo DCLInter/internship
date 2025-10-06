@@ -29,8 +29,10 @@ class Comparator:
         
         feature = pd.Series(array)
         outliers_iqr_index = feature[(feature < low_limit) | (feature > high_limit)].index
-        ourliers_mad_index = feature[score_mad > 3].index
+        ourliers_mad_index = feature[score_mad*0.6745 > 3].index
 
+        # print(array)
+        # print("outliers size",len(outliers_iqr), len(outliers_mad))
         df_outliers_iqr = pd.DataFrame(outliers_iqr,columns=["values"],index=outliers_iqr_index)
         df_outliers_mad = pd.DataFrame(outliers_mad,columns=["values"],index=ourliers_mad_index)
         
@@ -96,16 +98,14 @@ class Comparator:
 
         for patient in data.keys():
 
-            ft = data[patient][f"mean_{patient}"]
-            ft_clean = data_clean[patient][f"mean_{patient}"]
+            ft = data[patient]
+            ft_clean = data_clean[patient]
             change_perFeature = {}
             outliers_perFeature = {}
             change_outliers[patient] = pd.DataFrame(columns=["IQR_change", "MAD_change"])
 
             for feat in np.arange(len(ft_clean)):
                 x_before = ft[feat]
-                if x_before.size > 10:
-                    x_before = x_before[:len(x_before)//2]
                 x_after = ft_clean[feat]
                 
                 if x_before.size == 0 or x_after.size == 0: 
@@ -165,10 +165,8 @@ class Comparator:
 
             for p in data.keys():
                 idx_ft = search_feat(ft,ft_names)
-                x = data[p][f"mean_{p}"][idx_ft]
-                if x.size > 10:
-                    x = x[:len(x)//2]
-                y = data_clean[p][f"mean_{p}"][idx_ft]
+                x = data[p][idx_ft]
+                y = data_clean[p][idx_ft]
             
                 if x.size == 0 or y.size == 0:
                     continue
@@ -229,14 +227,15 @@ class Comparator:
         outliers = {}
         overlaps = {}
         outl_changes = pd.DataFrame(columns=["IQR_change", "MAD_change"],index=ft_names)
+        
         for ft in ft_names:
             feat_values = []
             feat_values_clean = []
             for p in data.keys():
                 idx_ft = search_feat(ft,ft_names)
-                x = data[p][f"mean_{p}"][idx_ft]
-                x = x[:len(x)//2]
-                y = data_clean[p][f"mean_{p}"][idx_ft]
+                x = data[p][idx_ft]
+                print("X",x)
+                y = data_clean[p][idx_ft]
 
                 if x.size == 0 or y.size == 0:
                     continue
@@ -333,6 +332,7 @@ class Comparator:
         for name, df in dataframes.items():
             filename = os.path.join(filepath, f"{name}.xlsx")
             to_xslx(df, filename)
+
     def extractResults_byPatient(self):
         print("Saving results for each patient: ")
         data = self.data

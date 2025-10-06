@@ -15,12 +15,10 @@ class Checker:
         self.fiducial_order = ['on','sp','dn','dp','off','u','v','w','a','b','c','d','e','f','p1','p2']  ### Order of
         self.features_names = features_names
 
-    def windows(self, patient: str, signal = None):
-        
+    def windows(self, fiducials: pd.DataFrame, signal = None):
+
         idx = signal
-        patient_fiducials = pd.DataFrame(self.data[patient]["segments"])
-        patient_fiducials.columns = self.ids[patient]
-        
+        patient_fiducials = fiducials
         y = patient_fiducials.iloc[:,idx].values
         l = len(y)
         n_fiducials = 16        ### 16 fiducial points
@@ -47,10 +45,14 @@ class Checker:
         flagSignals = 0
 
         idx = 0
+        patient_fiducials = pd.DataFrame(self.data[patient]["segments"])
+        patient_fiducials.columns = self.ids[patient]
         for sig in self.ids[patient]:
             fs = int(self.demo_info[patient]["SamplingFrequency"])
             nsamples = self.Nsamples[patient]
-            df_fiducials = self.windows(patient, idx)
+            
+            df_fiducials = self.windows(patient_fiducials, idx)
+            
             for fidu in df_fiducials.columns:
                 if fidu not in flagScores:
                     flagScores[fidu] = []
