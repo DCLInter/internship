@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset.h5"
     test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
 
     # =========================================================
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     for target in targets:
         print(f"Analysing - {target} - target")
-        mi_path = MI_RESULTS_PAPER / f"Original_DS/{target}.csv"
+        mi_path = MI_RESULTS_PAPER / f"Cleaned_DS/{target}.csv"
         mi_results = mi.compute_mi_summary(X_df, Y_df, X_df.columns, target, k = 5, save_path= mi_path)
         
 
