@@ -10,6 +10,9 @@ import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import seaborn as sns
+from matplotlib.colors import TwoSlopeNorm
+import matplotlib.cm as cm
 from pathlib import Path
 from sklearn.base import clone
 from sklearn.model_selection import GroupShuffleSplit
@@ -667,6 +670,120 @@ def plot_mean_std_scatter(
     for feat in top_features:
         plt.text(mean_vals[feat], std_vals[feat], feat, fontsize=8, ha="right")
 
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    elif save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+
+def plot_shap_magnitude(
+    shap_abs_matrix: pd.DataFrame,
+    figsize=(7, 10),
+    show=True,
+    save_path=None
+):
+    """
+    Plot feature contribution magnitude (mean |SHAP| ± SD) across iterations.
+
+    Parameters
+    ----------
+    shap_abs_matrix : pd.DataFrame
+        DataFrame [n_iter, n_features] with mean absolute SHAP values per iteration.
+    figsize : tuple, default=(7, 10)
+        Figure size in inches.
+    show : bool, default=True
+        Whether to display the plot.
+    save_path : str or Path, optional
+        Path to save the figure.
+    """
+    mean_abs = shap_abs_matrix.mean().sort_values(ascending=False)
+    std_abs = shap_abs_matrix.std()[mean_abs.index]
+
+    plt.figure(figsize=figsize)
+    sns.barplot(
+        x=mean_abs.values,
+        y=mean_abs.index,
+        color="royalblue",
+        orient="h",
+    )
+    plt.errorbar(
+        x=mean_abs.values,
+        y=range(len(mean_abs)),
+        xerr=std_abs.values,
+        fmt="none",
+        ecolor="black",
+        elinewidth=1,
+        capsize=4,
+        capthick=1,
+    )
+
+    plt.xlabel("Mean(|SHAP value|) ± SD across iterations")
+    plt.ylabel("Feature")
+    plt.title("Feature contribution magnitude")
+    plt.grid(axis="x", linestyle="--", alpha=0.4)
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    elif save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+
+def plot_shap_directionality(
+    shap_signed_matrix: pd.DataFrame,
+    figsize=(7, 10),
+    show=True,
+    save_path=None
+):
+    """
+    Plot feature contribution directionality (mean SHAP ± SD) across iterations.
+
+    Parameters
+    ----------
+    shap_signed_matrix : pd.DataFrame
+        DataFrame [n_iter, n_features] with mean signed SHAP values per iteration.
+    figsize : tuple, default=(7, 10)
+        Figure size in inches.
+    show : bool, default=True
+        Whether to display the plot.
+    save_path : str or Path, optional
+        Path to save the figure.
+    """
+    mean_signed = shap_signed_matrix.mean().sort_values()
+    std_signed = shap_signed_matrix.std()[mean_signed.index]
+
+    norm = TwoSlopeNorm(vmin=mean_signed.min(), vcenter=0, vmax=mean_signed.max())
+    cmap = cm.get_cmap("RdBu_r")
+    colors = [cmap(norm(v)) for v in mean_signed.values]
+
+    plt.figure(figsize=figsize)
+    sns.barplot(
+        x=mean_signed.values,
+        y=mean_signed.index,
+        palette=colors,
+        orient="h",
+    )
+    plt.errorbar(
+        x=mean_signed.values,
+        y=range(len(mean_signed)),
+        xerr=std_signed.values,
+        fmt="none",
+        ecolor="black",
+        elinewidth=1,
+        capsize=4,
+        capthick=1,
+    )
+    plt.axvline(0, color="k", lw=1)
+    plt.xlabel("Mean(SHAP value) ± SD across iterations")
+    plt.ylabel("Feature")
+    plt.title("Feature contribution directionality")
+    plt.grid(axis="x", linestyle="--", alpha=0.4)
     plt.tight_layout()
 
     if show:

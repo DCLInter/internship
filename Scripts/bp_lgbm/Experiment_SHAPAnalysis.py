@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset_90.h5"
 
     # =========================================================
     # Load Data
@@ -87,20 +87,21 @@ if __name__ == "__main__":
     groups = df_train["Subject"]
     X_train = df_train.drop(columns=id_cols)
     
-    Y_train = df_train[targets[0]]
+    Y_train = df_train[targets]
 
     # =========================================================
     # Shapley Analysis
     #==========================================================
-    Shap_path = SHAP_RESULTS_PAPER/"Original_DS"
-    top_k = 10
+    Shap_path = SHAP_RESULTS_PAPER/"Clean_90_DS"
 
     for target in targets:
+        Y_t = Y_train[target]
+        
         print(f"********** Analizing {target} **********")
         start = time.time()
         avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, avg_raw_shap, raw_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(pipeline, 
                                                                                                                     X_train, 
-                                                                                                                    Y_train,
+                                                                                                                    Y_t,
                                                                                                                     groups = groups, 
                                                                                                                     n_iter=30, 
                                                                                                                     save_path=Shap_path/f"{target}")
