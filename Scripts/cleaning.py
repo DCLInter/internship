@@ -35,8 +35,8 @@ class Cleaner:
 
         print("Cleaning process:")
         if data_ext is not None:
-            self.original_data = data_ext
-            data = data_ext
+            self.original_data = data_ext.copy()
+            data = data_ext.copy()
             self.demo_info = {}
             self.attributes = {}
         else:
@@ -149,7 +149,7 @@ class Cleaner:
             sc = df["combinedScore"].mean()
             stdS = df["combinedScore"].std()
 
-            numSignals = len(self.original_data[patient]["segments"])
+            numSignals = len(self.original_data[patient])
             numRemove = len(remove[patient])
 
             age = atributes[patient]["Age"][0]
