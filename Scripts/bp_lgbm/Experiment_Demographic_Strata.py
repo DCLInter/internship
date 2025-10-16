@@ -1,19 +1,22 @@
-############ EXPERIMENT MUTUAL INFORMATION ####################
+############ EXPERIMENT DEMOGRAPHIC STRATIFICATION ############
 #                                                             #
-# Here, the mutual information experiment will be performed   #
+# Here, THE ds WILL BE SPLITTED ACCORDING TO SOME STRATA      #
 #                                                             #
 ###############################################################
+
+import demo_strata_utils as ds
 import preprocessing
-import mutual_information as mi
-from local_paths import PULSE_DB_SUP_DIR, MI_RESULTS_PAPER
-from data import load_PulseDB_sup_ds
+from pathlib import Path
+from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER
+from data import load_PulseDB_sup_ds, load_config
 
 if __name__ == "__main__":
 
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset_80.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
+    test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
 
     # =========================================================
     # Load Data
@@ -25,8 +28,11 @@ if __name__ == "__main__":
                  "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
                  "FullSkew", "sdPRV", "IQR_PRV"]
     df_train = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
-    print(df_train.info())
+    df_test = load_PulseDB_sup_ds(test_original_path, feature_names=feature_names)
     
+    print(df_train.head())
+    print(df_test.head())
+
     # =========================================================
     # Check NaNs and fill them
     #==========================================================
@@ -37,29 +43,35 @@ if __name__ == "__main__":
     
     # Check if any NaN at all
     print("Is there any NaN in: df_features_mean?")
-    print(df_test.isna().any().any())
+    print(df_train.isna().any().any())
     # Count total number of NaNs
-    print(df_test.isna().sum())
+    print(df_train.isna().sum())
     """
     # Fill X NaNs
     df_train = preprocessing.median_impute_patientwise(df_train, patient_col= "Subject")
-    """
-    print(df_test.isna().any().any())
-    """
+    df_test = preprocessing.median_impute_patientwise(df_test, patient_col= "Subject")
 
     # =========================================================
-    # Mutual Information Analysis
+    # Segmentation by demo thresholds
     #==========================================================
-    id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"]
-    targets = ["SBP", "DBP", "MAP"]
-    id_cols.extend(targets)
-    X_df = df_train.drop(columns=id_cols)
-    Y_df = df_train[targets]
+    thresholds = {
+        "Age": [40, 60],
+        "BMI": [25],
+        "Gender": ["M", "F"]
+    }
+    dfs_dict_train = ds.segment_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose=True)
+    dfs_dict_test = ds.segment_thresholds(df_test, rules=thresholds, subject_col_name="Subject", verbose=True)
 
-    for target in targets:
-        print(f"Analysing - {target} - target")
-        mi_path = MI_RESULTS_PAPER / f"Cleaned_DS_80/{target}.csv"
-        mi_results = mi.compute_mi_summary(X_df, Y_df, X_df.columns, target, k = 5, save_path= mi_path)
-        
+    # =========================================================
+    # Initialize model
+    #==========================================================
+    # build the model
+    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
+    cfg = load_config(grid_path)
+    lgbm = build_lgbm(cfg)
 
-    
+    # build the pipeline
+    pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("model", lgbm)
+    ])

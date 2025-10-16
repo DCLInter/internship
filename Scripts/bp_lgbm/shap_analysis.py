@@ -8,6 +8,7 @@ import shap
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import pandas as pd
 import os
 import seaborn as sns
@@ -562,13 +563,11 @@ def plot_rank_boxplot(
     show=True,
     save_path=None,
     sort_by="mean",        # "mean", "median", or "hybrid"
-    alpha=0.5             # weight for std in hybrid metric
+    alpha=0.5              # weight for std in hybrid metric
 ):
     """
     Plot horizontal boxplots of feature ranks across iterations.
     Includes mean markers and flexible sorting criteria.
-
-    Plot horizontal boxplots of feature ranks across iterations.
 
     Parameters
     ----------
@@ -620,12 +619,15 @@ def plot_rank_boxplot(
         mean_val = mean_vals[feature]
         plt.plot(mean_val, i, "o", color="red", markersize=5)
 
+    # --- Fix x-axis range to total number of features ---
+    n_features = len(feature_names)
+    plt.xlim(0.5, n_features + 0.5)  # small padding
+
     plt.title(f"Top {top_k} features ({sort_label})")
     plt.xlabel("Rank (lower = more important)")
     plt.ylabel("Feature")
     plt.tight_layout()
 
-    # --- Save or show ---
     if show:
         plt.show()
     elif save_path is not None:
@@ -634,41 +636,87 @@ def plot_rank_boxplot(
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
 
+
 def plot_mean_std_scatter(
     rank_matrix,
     feature_names,
+    rank_matrix_2=None,
+    labels=("Condition 1", "Condition 2"),
     figsize=(8,6),
-    top_k_labels=10,
     show=True,
-    save_path=None
+    save_path=None,
+    annotate=True
 ):
     """
     Scatter plot of mean rank (importance) vs. std rank (stability).
+    Optionally compare two rank matrices side-by-side (blue vs red),
+    with fixed axis limits and color-matched feature labels.
 
     Parameters
     ----------
     rank_matrix : np.ndarray
-        Rank matrix [n_iter, n_features]
+        Rank matrix [n_iter, n_features] for the first condition.
     feature_names : list of str
-        Feature names
-    top_k_labels : int
-        Number of top features (lowest mean) to label
+        Feature names.
+    rank_matrix_2 : np.ndarray, optional
+        Second rank matrix [n_iter, n_features] for comparison.
+    labels : tuple of str, default=("Condition 1", "Condition 2")
+        Labels for legend if two matrices are plotted.
+    figsize : tuple, default=(8,6)
+        Figure size in inches.
+    show : bool, default=True
+        Whether to display the plot.
+    save_path : str or Path, optional
+        If provided, save the figure.
+    annotate : bool, default=True
+        If True, annotate all features by name.
     """
-    df = pd.DataFrame(rank_matrix, columns=feature_names)
-    mean_vals = df.mean()
-    std_vals = df.std()
 
-    plt.figure(figsize=figsize)
-    plt.scatter(mean_vals, std_vals, alpha=0.8)
-    plt.xlabel("Mean Rank (lower = more important)")
-    plt.ylabel("Rank Std (lower = more stable)")
-    plt.title("Feature Importance–Stability Trade-off")
-    plt.grid(alpha=0.3)
+    # --- Base data ---
+    df1 = pd.DataFrame(rank_matrix, columns=feature_names)
+    mean1, std1 = df1.mean(), df1.std()
 
-    # Annotate top-k important features
-    top_features = mean_vals.sort_values().head(top_k_labels).index
-    for feat in top_features:
-        plt.text(mean_vals[feat], std_vals[feat], feat, fontsize=8, ha="right")
+    has_second = rank_matrix_2 is not None
+    if has_second:
+        df2 = pd.DataFrame(rank_matrix_2, columns=feature_names)
+        mean2, std2 = df2.mean(), df2.std()
+
+    # --- Fixed limits ---
+    x_min, x_max = 0.5, len(feature_names) + 0.5
+    global_max_std = max(std1.max(), std2.max() if has_second else std1.max())
+    y_min, y_max = 0, global_max_std * 1.1
+
+    # --- Colors ---
+    color1, color2 = "dodgerblue", "firebrick"
+    darken = lambda c, amt=0.4: tuple((np.array(mcolors.to_rgb(c)) * amt).clip(0,1))
+    dark1, dark2 = darken(color1, 0.4), darken(color2, 0.4)
+
+    # --- Plot setup ---
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.scatter(mean1, std1, color=color1, alpha=0.8, label=labels[0], zorder=2)
+    if has_second:
+        ax.scatter(mean2, std2, color=color2, alpha=0.8, label=labels[1], zorder=2)
+        # Connect corresponding feature pairs
+        _connect_feature_pairs(ax, mean1, std1, mean2, std2, feature_names,
+                               color_line="gray", lw=0.8, alpha=0.6,
+                               annotate=True, label_color="black")
+    else:
+        # Single-condition annotations
+        if annotate:
+            for feat in feature_names:
+                ax.text(mean1[feat], std1[feat], feat,
+                        fontsize=7, color=dark1,
+                        ha="right", va="bottom")
+
+    # --- Style ---
+    ax.set_xlabel("Mean Rank (lower = more important)")
+    ax.set_ylabel("Rank Std (lower = more stable)")
+    ax.set_title("Feature Importance–Stability Map")
+    ax.grid(alpha=0.3)
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    if has_second:
+        ax.legend(frameon=True)
 
     plt.tight_layout()
 
@@ -677,22 +725,34 @@ def plot_mean_std_scatter(
     elif save_path is not None:
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save_path, bbox_inches="tight")
-        plt.close()
+        fig.savefig(save_path, bbox_inches="tight")
+        plt.close(fig)
 
 def plot_shap_magnitude(
     shap_abs_matrix: pd.DataFrame,
+    shap_abs_matrix_2: pd.DataFrame = None,
+    labels=("Condition 1", "Condition 2"),
+    top_k: int = None,
     figsize=(7, 10),
     show=True,
     save_path=None
 ):
     """
     Plot feature contribution magnitude (mean |SHAP| ± SD) across iterations.
+    Optionally compare two matrices side-by-side (blue vs red) for the same features.
+    The sorting and the selection of top k is arranged according matrix 1
 
     Parameters
     ----------
     shap_abs_matrix : pd.DataFrame
         DataFrame [n_iter, n_features] with mean absolute SHAP values per iteration.
+    shap_abs_matrix_2 : pd.DataFrame, optional
+        Second matrix for comparison (same features, same shape).
+    labels : tuple of str, default=("Condition 1", "Condition 2")
+        Legend labels for the two conditions.
+    top_k : int, optional
+        Number of top features to display (sorted by the first matrix's mean |SHAP|).
+        If None, show all features.
     figsize : tuple, default=(7, 10)
         Figure size in inches.
     show : bool, default=True
@@ -700,33 +760,75 @@ def plot_shap_magnitude(
     save_path : str or Path, optional
         Path to save the figure.
     """
-    mean_abs = shap_abs_matrix.mean().sort_values(ascending=False)
-    std_abs = shap_abs_matrix.std()[mean_abs.index]
 
+    # --- Compute statistics for first matrix ---
+    mean_abs1 = shap_abs_matrix.mean().sort_values(ascending=True)
+    std_abs1 = shap_abs_matrix.std()[mean_abs1.index]
+
+    has_second = shap_abs_matrix_2 is not None
+    if has_second:
+        # Align second matrix to same feature order
+        shap_abs_matrix_2 = shap_abs_matrix_2[mean_abs1.index]
+        mean_abs2 = shap_abs_matrix_2.mean()
+        std_abs2 = shap_abs_matrix_2.std()
+
+    # --- Select top-k features ---
+    if top_k is not None:
+        mean_abs1 = mean_abs1.head(top_k)
+        std_abs1 = std_abs1[mean_abs1.index]
+        if has_second:
+            mean_abs2 = mean_abs2[mean_abs1.index]
+            std_abs2 = std_abs2[mean_abs1.index]
+
+    # --- Fixed x-axis limit ---
+    max_val = max(mean_abs1.max() + std_abs1.max(),
+                  (mean_abs2 + std_abs2).max() if has_second else (mean_abs1 + std_abs1).max())
+    x_min, x_max = 0, max_val * 1.1
+
+    # --- Plot ---
     plt.figure(figsize=figsize)
-    sns.barplot(
-        x=mean_abs.values,
-        y=mean_abs.index,
-        color="royalblue",
-        orient="h",
-    )
-    plt.errorbar(
-        x=mean_abs.values,
-        y=range(len(mean_abs)),
-        xerr=std_abs.values,
-        fmt="none",
-        ecolor="black",
-        elinewidth=1,
-        capsize=4,
-        capthick=1,
-    )
+    y_positions = np.arange(len(mean_abs1))
+    bar_height = 0.35
 
+    if has_second:
+        # Plot both bars side by side
+        plt.barh(y_positions - bar_height/2, mean_abs1.values,
+                 height=bar_height, color="dodgerblue", alpha=0.9, label=labels[0])
+        plt.barh(y_positions + bar_height/2, mean_abs2.values,
+                 height=bar_height, color="firebrick", alpha=0.9, label=labels[1])
+
+        # Add error bars
+        plt.errorbar(mean_abs1.values, y_positions - bar_height/2,
+                     xerr=std_abs1.values, fmt="none",
+                     ecolor="black", elinewidth=1, capsize=3)
+        plt.errorbar(mean_abs2.values, y_positions + bar_height/2,
+                     xerr=std_abs2.values, fmt="none",
+                     ecolor="black", elinewidth=1, capsize=3)
+    else:
+        # Single dataset
+        plt.barh(y_positions, mean_abs1.values,
+                 height=bar_height, color="royalblue", alpha=0.9)
+        plt.errorbar(mean_abs1.values, y_positions,
+                     xerr=std_abs1.values, fmt="none",
+                     ecolor="black", elinewidth=1, capsize=3)
+
+    # --- Formatting ---
+    plt.yticks(y_positions, mean_abs1.index)
     plt.xlabel("Mean(|SHAP value|) ± SD across iterations")
     plt.ylabel("Feature")
-    plt.title("Feature contribution magnitude")
+    title = "Feature contribution magnitude"
+    if top_k is not None:
+        title += f" (Top {top_k})"
+    plt.title(title)
+    plt.xlim(x_min, x_max)
     plt.grid(axis="x", linestyle="--", alpha=0.4)
+
+    if has_second:
+        plt.legend(frameon=True)
+
     plt.tight_layout()
 
+    # --- Display or save ---
     if show:
         plt.show()
     elif save_path is not None:
@@ -743,6 +845,8 @@ def plot_shap_directionality(
 ):
     """
     Plot feature contribution directionality (mean SHAP ± SD) across iterations.
+    Features ordered from negative to positive mean SHAP, with fixed symmetric x-axis
+    and standardized color intensity.
 
     Parameters
     ----------
@@ -755,13 +859,22 @@ def plot_shap_directionality(
     save_path : str or Path, optional
         Path to save the figure.
     """
-    mean_signed = shap_signed_matrix.mean().sort_values()
+
+    # --- Compute statistics ---
+    mean_signed = shap_signed_matrix.mean().sort_values()   # negative → positive
     std_signed = shap_signed_matrix.std()[mean_signed.index]
 
-    norm = TwoSlopeNorm(vmin=mean_signed.min(), vcenter=0, vmax=mean_signed.max())
+    # --- Compute symmetric axis limits ---
+    max_abs = (abs(mean_signed) + std_signed).max()
+    x_lim = max_abs * 1.1
+    x_min, x_max = -x_lim, x_lim
+
+    # --- Color normalization (consistent saturation) ---
+    norm = TwoSlopeNorm(vmin=-max_abs, vcenter=0, vmax=max_abs)
     cmap = cm.get_cmap("RdBu_r")
     colors = [cmap(norm(v)) for v in mean_signed.values]
 
+    # --- Plot ---
     plt.figure(figsize=figsize)
     sns.barplot(
         x=mean_signed.values,
@@ -769,9 +882,11 @@ def plot_shap_directionality(
         palette=colors,
         orient="h",
     )
+
+    # Error bars
     plt.errorbar(
         x=mean_signed.values,
-        y=range(len(mean_signed)),
+        y=np.arange(len(mean_signed)),
         xerr=std_signed.values,
         fmt="none",
         ecolor="black",
@@ -779,13 +894,17 @@ def plot_shap_directionality(
         capsize=4,
         capthick=1,
     )
+
+    # --- Formatting ---
     plt.axvline(0, color="k", lw=1)
     plt.xlabel("Mean(SHAP value) ± SD across iterations")
     plt.ylabel("Feature")
     plt.title("Feature contribution directionality")
+    plt.xlim(x_min, x_max)
     plt.grid(axis="x", linestyle="--", alpha=0.4)
     plt.tight_layout()
 
+    # --- Show or save ---
     if show:
         plt.show()
     elif save_path is not None:
@@ -793,3 +912,55 @@ def plot_shap_directionality(
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
+        
+# --- Helper -------------------------------------------------------------
+
+def _connect_feature_pairs(
+    ax,
+    mean1,
+    std1,
+    mean2,
+    std2,
+    feature_names,
+    color_line="gray",
+    lw=0.8,
+    alpha=0.6,
+    annotate=True,
+    label_color="black"
+):
+    """
+    Connect corresponding feature points between two conditions
+    and place one label at the midpoint.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axis object to draw on.
+    mean1, std1, mean2, std2 : pd.Series
+        Mean and std for each feature in both conditions.
+    feature_names : list of str
+        List of features to connect.
+    color_line : str, default="gray"
+        Color of connecting lines.
+    lw : float, default=0.8
+        Line width.
+    alpha : float, default=0.6
+        Line transparency.
+    annotate : bool, default=True
+        If True, add midpoint labels.
+    label_color : str, default="black"
+        Color of feature name labels.
+    """
+    for feat in feature_names:
+        x1, y1 = mean1[feat], std1[feat]
+        x2, y2 = mean2[feat], std2[feat]
+
+        # Draw connection line
+        ax.plot([x1, x2], [y1, y2],
+                color=color_line, lw=lw, alpha=alpha, zorder=1)
+
+        # Label at midpoint
+        if annotate:
+            mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+            ax.text(mid_x, mid_y, feat, fontsize=7,
+                    color=label_color, ha="center", va="center", zorder=3)
