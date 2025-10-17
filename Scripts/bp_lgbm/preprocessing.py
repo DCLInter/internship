@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from typing import Dict, List
 import h5py
 from typing import List, Tuple, Union, Optional
+from sklearn.model_selection import StratifiedShuffleSplit
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FUNCTIONS FOR SPLITTING         ~
@@ -136,32 +137,28 @@ def split_train_test(XY: pd.DataFrame, split_results: dict, patient_col: str = "
 def split_XY(
     XY: pd.DataFrame,
     target_cols: List[str],
-    id_cols: List[str] = ["Patient", "segment_ID"]
+    id_cols: List[str] = ["Patient", "segment_ID"],
+    drop_cols: List[str] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Split XY dataframe into X (features) and Y (targets).
-    
-    Args:
-        XY: Combined dataframe.
-        target_cols: List of target column names (Y).
-        id_cols: Columns to keep in both X and Y (default: ["Patient", "Segment_ID"]).
-    
-    Returns:
-        X (DataFrame), Y (DataFrame)
+    Split combined dataframe into X (features) and Y (target),
+    automatically removing other BP target columns.
     """
-    # --- Validate ---
-    missing_targets = [c for c in target_cols if c not in XY.columns]
-    if missing_targets:
-        raise KeyError(f"Missing target columns: {missing_targets}")
 
-    # Keep IDs if present in DataFrame
+    drop_cols = drop_cols or []
+
+    # --- Drop other target columns if present ---
+    all_targets = {"SBP", "DBP", "MAP"}
+    current_target = target_cols[0]
+    other_targets = list(all_targets - {current_target})
+    total_drop = list(set(drop_cols + other_targets))
+
+    # --- Build Y and X ---
     ids_in_df = [c for c in id_cols if c in XY.columns]
-
-    # Y = targets + IDs
     Y = XY[ids_in_df + target_cols].copy()
 
-    # X = all other columns except targets, but keep IDs
-    X_cols = [c for c in XY.columns if c not in target_cols]
+    exclude_cols = set(target_cols + total_drop)
+    X_cols = [c for c in XY.columns if c not in exclude_cols]
     X = XY[X_cols].copy()
 
     return X, Y
@@ -336,6 +333,69 @@ def downsample_per_patient(
     df_resampled = pd.concat(sampled_frames).reset_index(drop=True)
     
     return df_resampled
+
+def select_subjects_by_target_distribution(
+    df: pd.DataFrame,
+    subject_col: str,
+    target_col: str,
+    n_subjects: int,
+    n_bins: int = 10,
+    random_state: int = 42
+) -> list:
+    """
+    Select a subset of subjects preserving the distribution of a target variable 
+    (e.g., MAP or SBP) based on subject-level means.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset containing at least subject_col and target_col columns.
+    subject_col : str
+        Column name identifying each subject.
+    target_col : str
+        Continuous target variable to preserve (e.g., 'MAP' or 'SBP').
+    n_subjects : int
+        Number of subjects to keep.
+    n_bins : int, default=10
+        Number of bins to use for stratification (higher = finer matching).
+    random_state : int, default=42
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    selected_subjects : list
+        List of selected subject IDs.
+    """
+    # --- Collapse dataset to subject-level mean of the target ---
+    subj_stats = (
+        df.groupby(subject_col)[target_col]
+          .mean()
+          .rename(f"{target_col}_mean")
+          .reset_index()
+    )
+
+    # --- Create stratification bins on subject-level means ---
+    subj_stats["bin"] = pd.qcut(
+        subj_stats[f"{target_col}_mean"], 
+        q=n_bins, 
+        labels=False, 
+        duplicates="drop"
+    )
+
+    # --- Stratified sampling of subjects ---
+    n_total = len(subj_stats)
+    if n_subjects > n_total:
+        raise ValueError(f"Requested {n_subjects} subjects, but only {n_total} available.")
+
+    sss = StratifiedShuffleSplit(
+        n_splits=1,
+        test_size=n_total - n_subjects,
+        random_state=random_state
+    )
+    train_idx, _ = next(sss.split(subj_stats[[subject_col]], subj_stats["bin"]))
+    selected_subjects = subj_stats.iloc[train_idx][subject_col].tolist()
+
+    return selected_subjects
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -6,9 +6,15 @@
 
 import demo_strata_utils as ds
 import preprocessing
+import eval
 from pathlib import Path
-from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER
-from data import load_PulseDB_sup_ds, load_config
+from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER, DEMOG_RESULTS_PAPER
+from data import load_PulseDB_sup_ds
+from config import load_config
+from models import build_lgbm
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.base import clone # to clone the pipeline freshh to avoid any cross contamination while looping
 
 if __name__ == "__main__":
 
@@ -75,3 +81,22 @@ if __name__ == "__main__":
         ("scaler", StandardScaler()),
         ("model", lgbm)
     ])
+    # Set the targets
+    drop_cols = ["Age", "Gender", "Height", "Weight", "BMI", "SF"]
+    targets = ["SBP", "DBP", "MAP"]
+
+    # =========================================================
+    # Call the loop for running the stratified analysis
+    #==========================================================
+    for target in targets:
+        df_results = ds.run_analysis_for_target(
+            dfs_dict_train,
+            dfs_dict_test,
+            target=target,
+            model_fn=lambda: clone(pipeline),  # <-- creates a fresh copy each loop
+            val_split_size=0.1,
+            train_subset_size=0.1,
+            evaluate_fn=eval.evaluate,
+            base_results_dir=DEMOG_RESULTS_PAPER,
+            drop_features=drop_cols,
+        )
