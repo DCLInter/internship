@@ -57,6 +57,20 @@ lightGBM_best_guess_1 = {
     "bagging_freq": 1,       # resample every iteration
 }
 
+stress_test_params = { #Empirically derived from the GS subject wise done. Selected the one with highest train score (lowest test score --> overfitted)
+    'num_leaves': 63, 
+    'n_estimators': 1000, 
+    'min_gain_to_split': 0.1, 
+    'min_data_in_leaf': 50, 
+    'max_depth': -1, 
+    'learning_rate': 0.2, 
+    'lambda_l2': 1, 
+    'lambda_l1': 0, 
+    'feature_fraction': 0.7, 
+    'bagging_freq': 1, 
+    'bagging_fraction': 0.8
+}
+
 def save_config(cfg, filepath: str):
     """
     Save the current ExperimentConfig as a JSON file.

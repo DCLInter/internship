@@ -1,7 +1,8 @@
-############ ILLUSION PERFORMANCE EXPERIMENT ##################
+############ STRESS TEST ######################################
 #                                                             #
-# Here, we will try to reporduce too optimistic results       #
-# from literature                                             #
+# Here, I will fit an agressive light gbm config              #
+# that is prone to overfitting to test the ceiling            #
+# of the model                                                #
 #                                                             #
 ###############################################################
 import preprocessing
@@ -9,7 +10,7 @@ import eval
 from pathlib import Path
 from local_paths import PULSE_DB_SUP_DIR, PERFORMANCE_RESULTS_PAPER, GS_RESULT_PAPER
 from data import load_PulseDB_sup_ds
-from config import ExperimentConfig, load_config
+from config import ExperimentConfig, load_config, stress_test_params
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
@@ -52,71 +53,21 @@ if __name__ == "__main__":
     # Fill X NaNs
     df_train = preprocessing.median_impute_patientwise(df_train, patient_col= "Subject")
     df_test = preprocessing.median_impute_patientwise(df_test, patient_col= "Subject")
-    
-    # =========================================================
-    # Downsampling of subjects and samples
-    #==========================================================
-    chosen_subjects = preprocessing.select_subjects_by_target_distribution(
-        df_train,
-        subject_col='Subject',
-        target_col='SBP',   # or 'SBP'
-        n_subjects=100,
-        n_bins=10,
-        random_state=42
-    )
-
-    # Filter the main dataset
-    df_train_subset = df_train[df_train['Subject'].isin(chosen_subjects)].copy()
-
-    # Downsample by subject
-    df_train_subset = preprocessing.downsample_per_patient(df_train_subset, 
-                                                           patient_col="Subject",
-                                                           proportion=0.05,
-                                                           random_state=42)
-
-    print(f"Selected {len(chosen_subjects)} subjects, {len(df_train_subset)} total samples.")
-
-    # ----- Same for testing --------
-    chosen_subjects_test = preprocessing.select_subjects_by_target_distribution(
-        df_test,
-        subject_col='Subject',
-        target_col='SBP',   # or 'SBP'
-        n_subjects=85,
-        n_bins=10,
-        random_state=42
-    )
-
-    # Filter the main dataset
-    df_test_subset = df_test[df_test['Subject'].isin(chosen_subjects_test)].copy()
-
-    # Downsample by subject
-    df_test_subset = preprocessing.downsample_per_patient(df_test_subset, 
-                                                           patient_col="Subject",
-                                                           proportion=0.01,
-                                                           random_state=42)
-
-    print(f"Selected {len(chosen_subjects_test)} subjects, {len(df_test_subset)} total samples.")
-
-    # =========================================================
-    # Gender as categorical
-    # =========================================================
-    df_train_subset["Gender"] = df_train_subset["Gender"].astype("category")
-    df_test_subset["Gender"] = df_test_subset["Gender"].astype("category")
 
     # =========================================================
     # Initialize model
     #==========================================================
     
     # drop ID columns before training
-    id_cols = ["SF"] #"Age","Gender", "Height", "Weight", "BMI",
+    id_cols = ["Age","Gender", "Height", "Weight", "BMI", "SF"]
     targets = ["SBP", "DBP", "MAP"]
     id_cols.extend(targets)
     groups = df_train["Subject"]
-    X_train = df_train_subset.drop(columns=id_cols)
-    X_test = df_test_subset.drop(columns=id_cols)
+    X_train = df_train.drop(columns=id_cols)
+    X_test = df_test.drop(columns=id_cols)
 
-    Y_train = df_train_subset[targets]
-    Y_test = df_test_subset[targets]
+    Y_train = df_train[targets]
+    Y_test = df_test[targets]
     
     # Splittin sample wise
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
@@ -133,15 +84,13 @@ if __name__ == "__main__":
 
     # build the model
     
-    grid_path = GS_RESULT_PAPER / "SAMPLE_Full_Grid_Randomized_search_3targets.json"
-    cfg = load_config(grid_path)
-    """
+    
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
                            experiment_name="Overperformance",
                            verbose = -1,
-                           model_params=overperformance_test_params)
-                """            
+                           model_params=stress_test_params)
+                         
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -149,11 +98,11 @@ if __name__ == "__main__":
         ("scaler", StandardScaler()),
         ("model", lgbm)
     ])
-    """
+    
     model = pipeline.named_steps["model"]
     print(model.get_params()["num_leaves"])
     print(model.get_params()["n_estimators"])
-    """
+    
     # =========================================================
     # Training and Eval
     #==========================================================
@@ -165,15 +114,15 @@ if __name__ == "__main__":
         Y_tr_sub = Y_sub_train[target]
 
         # Train
-        lgbm.fit(X_train, Y_tr)                              
+        pipeline.fit(X_train, Y_tr)                              
 
         # Pred
-        Y_val_pred = lgbm.predict(X_val)
-        Y_pred = lgbm.predict(X_test)
-        Y_tr_sub_pred = lgbm.predict(X_sub_train)
+        Y_val_pred = pipeline.predict(X_val)
+        Y_pred = pipeline.predict(X_test)
+        Y_tr_sub_pred = pipeline.predict(X_sub_train)
 
         # Eval
-        Path_res = PERFORMANCE_RESULTS_PAPER / r"Overperformance_2"
+        Path_res = PERFORMANCE_RESULTS_PAPER / r"Stress_Test"
         metrics_train = eval.evaluate(Y_tr_sub, Y_tr_sub_pred, 
                                              BA_path=Path_res / f"BA_train_subset_{target}.png",
                                              R2_path= Path_res / f"R2_train_subset_{target}.png")
