@@ -13,3 +13,4 @@ Bland_Altman_results
 # Ignore Python cache
 __pycache__/
 *.pyc
+Scripts/test.py
