@@ -5,7 +5,7 @@
 #                                                             #
 ###############################################################
 
-import preprocessing
+import demo_strata_utils as ds
 from pathlib import Path
 from local_paths import PULSE_DB_SUP_DIR
 from data import load_PulseDB_sup_ds
@@ -33,30 +33,29 @@ if __name__ == "__main__":
     
     print(df_train.head())
     print(df_test.head())
-    """
-    # =========================================================
-    # Check NaNs and fill them
-    #==========================================================
-    # Fill X NaNs
-    df_train = preprocessing.median_impute_patientwise(df_train, patient_col= "Subject")
-    df_test = preprocessing.median_impute_patientwise(df_test, patient_col= "Subject")
 
     # =========================================================
     # Distribution Plots
     #==========================================================
+    """
     num_features = ["Age", "BMI", "Height", "Weight", "SBP", "DBP"]
     plots.plot_numeric_distributions(df_train, num_features, "Train")
     plots.plot_numeric_distributions(df_test, num_features, "Test")
-    """
+    
     plots.plot_gender_distribution(df_train, "Train")
     plots.plot_gender_distribution(df_test, "Test")
-    
-    thresholds = {
-        "Age": [40, 60],
-        "BMI": [18.5, 25],
-        "SBP": [90, 120, 140], # dont pay aattention to the subject number
-        "DBP": [40, 90]
-    }
 
     plots.plot_threshold_proportions(df_train, thresholds, dataset_name="Train")
     plots.plot_threshold_proportions(df_test, thresholds, dataset_name="Test")
+    """
+    thresholds = {
+        "Age": [40, 60],
+        "BMI": [25],
+        "Gender": ["M", "F"]
+    }
+
+    # =========================================================
+    # Stratification
+    #==========================================================
+    subsets_dfs = ds.segment_multilabel_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
+    print(subsets_dfs.keys())
