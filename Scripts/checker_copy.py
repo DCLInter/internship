@@ -3,15 +3,15 @@ import pandas as pd
 import numpy as np
 from metrics_functions import Metrics
 class Checker:
-    def __init__(self, threshold: dict = {}, data_ext: dict = {}, features_names: list = []):
+    def __init__(self, threshold: dict = {}, data_ext: dict = {}, features_names: list = [], demo_info: dict = {}, samples: dict = {}, ids: dict = {}):
 
-        self.ids = {}
-        self.demo_info = {}
-        self.Nsamples = {}
+        self.ids = ids.copy()
+        self.demo_info = demo_info.copy()
+        self.Nsamples = samples.copy()
         self.resultsMetrics = {}
         self.df_results = {}
         self.threshold = threshold
-        self.data = data_ext
+        self.data = data_ext.copy()
         self.fiducial_order = ['on','sp','dn','dp','off','u','v','w','a','b','c','d','e','f','p1','p2']  ### Order of
         self.features_names = features_names
 
@@ -129,7 +129,7 @@ class Checker:
             "numberProperFiducials": number_fiducialsDetect,
             "numberProperFiducials_byDerivatives": number_derivativesDetected
         }
-        self.resultsMetrics[patient] = resultsMetrics
+        self.resultsMetrics[patient] = resultsMetrics.copy()
 
         return resultsMetrics
 
