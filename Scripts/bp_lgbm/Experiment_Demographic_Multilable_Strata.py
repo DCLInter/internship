@@ -61,9 +61,9 @@ if __name__ == "__main__":
     # Segmentation by demo thresholds
     #==========================================================
     thresholds = {
-        "Age": [40, 60],
+        #"Age": [40, 60],
         "BMI": [25],
-        "Gender": ["M", "F"]
+        "Gender": ["F", "M"]
     }
     dfs_dict_train = ds.segment_multilabel_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
     dfs_dict_test = ds.segment_multilabel_thresholds(df_test, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
             val_split_size=0.1,
             train_subset_size=0.1,
             evaluate_fn=eval.evaluate,
-            base_results_dir=DEMOG_RESULTS_PAPER,
+            base_results_dir=DEMOG_RESULTS_PAPER/"Stratified_2labels/BMI_Gender",
             drop_features=drop_cols,
             multilabel_mode=True
         )
