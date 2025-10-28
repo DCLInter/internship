@@ -91,6 +91,12 @@ if __name__ == "__main__":
         X_train, Y_train, test_size=0.1, random_state=42, shuffle=True, stratify=X_train["Subject"]
     )
 
+    #-----------------------------------------
+    # Just for diagnosing the model
+    #-----------------------------------------
+    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
+
+    X_sub_train = X_sub_train.drop(columns=["Subject"])
     X_train = X_train.drop(columns=["Subject"])
     X_test = X_test.drop(columns=["Subject"])
     X_val = X_val.drop(columns=["Subject"])
@@ -101,29 +107,40 @@ if __name__ == "__main__":
         Y_tr = Y_train[target]
         Y_v = Y_val[target]
         Y_t = Y_test[target]
+        Y_tr_sub = Y_sub_train[target]
 
         # --- Fit model ---
         model.fit(X_train, Y_tr)
 
         # --- Predict ---
+        Y_tr_sub_pred = model.predict(X_sub_train)
         Y_pred_val = model.predict(X_val)
         Y_pred_test = model.predict(X_test)
 
-        Bland_Altman_Path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/BA"
-        R2_path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/R2"
-        res_path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline/Performance"
-        print(Y_v.shape, Y_pred_val.shape)
-        metrics_val_original = eval.evaluate(Y_v, Y_pred_val, 
-                                                BA_path=Bland_Altman_Path / f"val_baseline_{target}.png",
-                                                R2_path= R2_path / f"val_clean_{target}.png",
-                                                save_results=res_path/ f"val_clean_{target}.csv")
+        res_path = PERFORMANCE_RESULTS_PAPER / r"Demographic_Baseline"
+        metrics_train = eval.evaluate(Y_tr_sub, Y_tr_sub_pred, 
+                                             BA_path=res_path / f"BA_train_subset_{target}.png",
+                                             R2_path= res_path / f"R2_train_subset_{target}.png")
+        metrics_val = eval.evaluate(Y_v, Y_pred_val, 
+                                             BA_path=res_path / f"BA_val_{target}.png",
+                                             R2_path= res_path / f"R2_val_{target}.png")
         metrics_test_original = eval.evaluate(Y_t, Y_pred_test, 
-                                                BA_path=Bland_Altman_Path / f"test_baseline_{target}.png",
-                                                R2_path= R2_path / f"test_baseline_{target}.png",
-                                                save_results=res_path/ f"test_baseline_{target}.csv")
+                                              BA_path=res_path / f"BA_test_original_{target}.png",
+                                              R2_path= res_path / f"R2_test_original_{target}.png")
 
+        print(f"=== Results for {target}, in Training ===")
+        print(metrics_train)
+        
         print(f"=== Results for {target}, in VAL ===")
-        print(metrics_val_original)
+        print(metrics_val)
         
         print(f"=== Results for {target}, in TEST ===")
         print(metrics_test_original)
+
+        # Create dict for saving results
+        results = {
+            "Train": metrics_train,
+            "Val": metrics_val,
+            "Test_original": metrics_test_original
+        }
+        eval.save_results_dict(results, res_path/ f"Results_{target}.csv", "Data_Subset")

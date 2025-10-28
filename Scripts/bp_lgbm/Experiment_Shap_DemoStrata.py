@@ -13,10 +13,11 @@ For the iterative process for the feature ranking is borrowed from:
 import numpy as np
 import preprocessing
 import shap_analysis as sa
+import demo_strata_utils as ds
 from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER, SHAP_RESULTS_PAPER
 from data import load_PulseDB_sup_ds
 from models import build_lgbm
-from config import ExperimentConfig, load_config, stress_test_params
+from config import load_config
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from pathlib import Path
@@ -64,22 +65,9 @@ if __name__ == "__main__":
     # Initialize model
     #==========================================================
     
-    print(df_train.info())
-    """
-    df_train = preprocessing.downsample_per_patient(df_train, patient_col="Subject", proportion = 0.1)
-    print(df_train.info())
-    """
     # build the model
-    """
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
-    """
-    cfg = ExperimentConfig(n_splits=5,
-                           random_state=42, 
-                           experiment_name="Aggressive_fit_shap_Original_ds",
-                           verbose = -1,
-                           model_params=stress_test_params)
-    
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -88,34 +76,26 @@ if __name__ == "__main__":
         ("model", lgbm)
     ])
 
-    # Splitting and dropping
-    id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"]
-    targets = ["SBP", "DBP", "MAP"]
-    id_cols.extend(targets)
-    groups = df_train["Subject"]
-    X_train = df_train.drop(columns=id_cols)
-    
-    Y_train = df_train[targets]
-
+    # =========================================================
+    # Segmentation by demo thresholds
+    #==========================================================
+    thresholds = {
+        "Age": [40, 60],
+        "BMI": [25],
+        "Gender": ["M", "F"]
+    }
+    dfs_dict_train = ds.segment_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose=True)
     # =========================================================
     # Shapley Analysis
     #==========================================================
-    Shap_path = SHAP_RESULTS_PAPER/"StressTest_Original"
+    strata_root = SHAP_RESULTS_PAPER / "Stratified_1variable"
 
-    for target in targets:
-        Y_t = Y_train[target]
-        
-        print(f"********** Analizing {target} **********")
-        start = time.time()
-        avg_rank, rank_matrix, avg_abs_shap, abs_shap_matrix, avg_raw_shap, raw_shap_matrix, rank_diff_matrix, feature_names = sa.shap_rank_stability(pipeline, 
-                                                                                                                    X_train, 
-                                                                                                                    Y_t,
-                                                                                                                    groups = groups, 
-                                                                                                                    n_iter=30, 
-                                                                                                                    save_path=Shap_path/f"{target}")
-        end = time.time()
-        print(f"Execution time: {end - start:.3f} seconds")
-        print("end", "\n")
-
-    
-    
+    for variable, strata_list in dfs_dict_train.items():
+        ds.run_shap_experiment_stratified(
+            strata_list=strata_list,
+            variable_name=variable,
+            output_root=strata_root,
+            targets=["SBP", "DBP", "MAP"],
+            pipeline=pipeline,
+            n_iter=30
+    )
