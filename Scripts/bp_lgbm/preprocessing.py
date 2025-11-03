@@ -386,16 +386,18 @@ def select_subjects_by_target_distribution(
     n_total = len(subj_stats)
     if n_subjects > n_total:
         raise ValueError(f"Requested {n_subjects} subjects, but only {n_total} available.")
+    if n_subjects >= len(subj_stats):
+        return subj_stats[subject_col].values  # no need to split
+    else:
+        sss = StratifiedShuffleSplit(
+            n_splits=1,
+            test_size=1 - (n_subjects/n_total),
+            random_state=random_state
+        )
+        train_idx, _ = next(sss.split(subj_stats[[subject_col]], subj_stats["bin"]))
+        selected_subjects = subj_stats.iloc[train_idx][subject_col].tolist()
 
-    sss = StratifiedShuffleSplit(
-        n_splits=1,
-        test_size=n_total - n_subjects,
-        random_state=random_state
-    )
-    train_idx, _ = next(sss.split(subj_stats[[subject_col]], subj_stats["bin"]))
-    selected_subjects = subj_stats.iloc[train_idx][subject_col].tolist()
-
-    return selected_subjects
+        return selected_subjects
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
