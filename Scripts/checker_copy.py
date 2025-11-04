@@ -30,12 +30,21 @@ class Checker:
     
     def metrics(self, patient):
         print("Metrics:")
-        # Storage variables for a single patient
+        # Storage variables for a single patient (or group)
         scores = {}
         flagScores = {}
         number_derivativesDetected = {}
+        wrongOrdFidu = {}
+        problemsPercentageFiducials = {}
 
-        # Process only the specified patient
+        for fidu in self.fiducial_order:
+            if fidu not in flagScores:
+                flagScores[fidu] = []
+            if fidu not in wrongOrdFidu:
+                wrongOrdFidu[fidu] = []
+            if fidu not in problemsPercentageFiducials:
+                problemsPercentageFiducials[fidu] = []
+
         lowsp = []
         anormalHR = []
         no_d = []
@@ -44,21 +53,22 @@ class Checker:
         ratioFpDetect = []
         flagSignals = 0
 
+        # Process only the specified patient (or group)
         idx = 0
         patient_fiducials = pd.DataFrame(self.data[patient]["segments"])
         patient_fiducials.columns = self.ids[patient]
+        
         for sig in self.ids[patient]:
             fs = int(self.demo_info[patient]["SamplingFrequency"])
             nsamples = self.Nsamples[patient]
             
+            ### Adquaring the windows to analice per signal
             df_fiducials = self.windows(patient_fiducials, idx)
             
-            for fidu in df_fiducials.columns:
-                if fidu not in flagScores:
-                    flagScores[fidu] = []
-
+            ### Metrics process (abnormal HR, checking the number of detected peaks, scores)
             metrics = Metrics(df_fiducials, fs, nsamples, self.threshold)
 
+            ### Missing fiducials in the signal, flag the signal if its missing at least 1
             flagND = metrics.checkNA()
             if flagND > 0:
                 no_d.append(sig)
@@ -67,7 +77,12 @@ class Checker:
             if numSP == True:
                 lowsp.append(sig)
 
-            wrongOrdFidu, numFlags, winFlags = metrics.checkOrder(patient, sig)
+            wrongOrd, numFlags, winFlags, probelmPerc = metrics.checkOrder(sig)
+            for f in probelmPerc.keys():
+                problemsPercentageFiducials[f].append(probelmPerc[f])
+            
+            for f in wrongOrd.keys():
+                wrongOrdFidu[f].extend(wrongOrd[f])
 
             wNum = len(winFlags.keys())
             fpNum = wNum * 16
@@ -117,17 +132,18 @@ class Checker:
         number_fiducialsDetect = ratioFpDetect
 
         resultsMetrics = {
-            "checkHR": abnormalHR_data,
-            "checkSP": abnormalSP_data,
-            "checkNAvalues": no_detect,
-            "numberNAvalues": num_noDetect,
-            "checkOrderFiducials": wrongOrdFidu,
-            "numberOverlapFiducials": number_overlapFiducial,
-            "numberOverlapWindows": number_overlapWindows,
-            "flagForScore": flagScores,
-            "combinedScore": scores,
-            "numberProperFiducials": number_fiducialsDetect,
-            "numberProperFiducials_byDerivatives": number_derivativesDetected
+            "checkHR": abnormalHR_data,     ### signals (their segment_id) with extreme HR values
+            "checkSP": abnormalSP_data,     ### signals that didnt contain enough amount of SP
+            "checkNAvalues": no_detect,     ### signals with at least 1 NA values in their fiducials
+            "numberNAvalues": num_noDetect,     ### percentage of NA values for each signal
+            "checkOrderFiducials": wrongOrdFidu,    ### signals with at least 1 fiducial overlapped or NA value
+            "numberOverlapFiducials": number_overlapFiducial,   ### signals with at least 1 overlapped fiducial
+            "numberOverlapWindows": number_overlapWindows,       ### number of windows of the signal that has any fiducial point overlapped, each elemt of the list represents a signal (in order) of the group
+            "flagForScore": flagScores,     ### signals that didnt meet the threshold for the score
+            "combinedScore": scores,        ### scores (by windows) divided by each fiducial points per signal
+            "numberProperFiducials": number_fiducialsDetect,    ### percentage of fiducials properly detected
+            "numberProperFiducials_byDerivatives": number_derivativesDetected,   ### percentage for each derivative
+            "percentageProblematicFiducials": problemsPercentageFiducials
         }
         self.resultsMetrics[patient] = resultsMetrics.copy()
 
@@ -136,7 +152,7 @@ class Checker:
     def results(self, patient):
 
         print("Analysis of metrics:")
-        remove = ["numberOverlapWindows","checkOrderFiducials","numberOverlapFiducials","flagForScore","checkNAvalues"]
+        remove = ["numberOverlapWindows","checkOrderFiducials","numberOverlapFiducials","flagForScore","checkNAvalues","percentageProblematicFiducials"]
         results = {k: v for k, v in self.resultsMetrics[patient].items() if k not in remove}
         ids = self.ids[patient]
 
