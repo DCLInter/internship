@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
     # Splitting and dropping
     id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"]
-    targets = ["SBP", "DBP", "MAP"]
+    targets = ["MAP"] #["SBP", "DBP", "MAP"]
     id_cols.extend(targets)
     groups = df_train["Subject"]
     X_train = df_train.drop(columns=id_cols)

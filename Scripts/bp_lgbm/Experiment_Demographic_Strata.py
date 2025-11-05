@@ -10,7 +10,7 @@ import eval
 from pathlib import Path
 from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER, DEMOG_RESULTS_PAPER
 from data import load_PulseDB_sup_ds
-from config import load_config
+from config import ExperimentConfig, load_config, stress_test_params
 from models import build_lgbm
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -72,8 +72,15 @@ if __name__ == "__main__":
     # Initialize model
     #==========================================================
     # build the model
+    """
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
+    """
+    cfg = ExperimentConfig(n_splits=5,
+                           random_state=42, 
+                           experiment_name="Stress_Test_Demographics",
+                           verbose = -1,
+                           model_params=stress_test_params)
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -88,6 +95,7 @@ if __name__ == "__main__":
     # =========================================================
     # Call the loop for running the stratified analysis
     #==========================================================
+    path = DEMOG_RESULTS_PAPER/ r"Stress_Test_1variable"
     for target in targets:
         df_results = ds.run_analysis_for_target(
             dfs_dict_train,
@@ -97,6 +105,6 @@ if __name__ == "__main__":
             val_split_size=0.1,
             train_subset_size=0.1,
             evaluate_fn=eval.evaluate,
-            base_results_dir=DEMOG_RESULTS_PAPER,
+            base_results_dir=path,
             drop_features=drop_cols,
         )

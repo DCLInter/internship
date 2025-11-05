@@ -60,3 +60,6 @@ if __name__ == "__main__":
     subsets_dfs = ds.segment_multilabel_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
     subsets_dfs_test = ds.segment_multilabel_thresholds(df_test, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
     print(subsets_dfs.keys())
+
+    subsets_1var = ds.segment_thresholds(df_train, thresholds,"Subject", True)
+    subsets_1var_test = ds.segment_thresholds(df_test, thresholds,"Subject", True)
