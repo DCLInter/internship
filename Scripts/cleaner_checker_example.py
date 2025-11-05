@@ -1,4 +1,4 @@
-from checker import Checker
+from Scripts.checker_old import Checker
 from cleaning import Cleaner
 
 #### Checking and generating a report for the fiducial points ####
