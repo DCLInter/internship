@@ -76,7 +76,7 @@ y = y.T
 for fidu in ck.fiducial_order:
     Problems_full_set.loc["Ratio (%)",fidu] = np.mean(y[fidu])
 print(Problems_full_set)
-with pd.ExcelWriter("D:/U/Practicas_City_University_of_London/Data/Thresholds_80/Problems_Fiducials.xlsx") as writer:
+with pd.ExcelWriter("D:/U/Practicas_City_University_of_London/Data/Problems_Fiducials.xlsx") as writer:
     Problems_full_set.to_excel(writer,sheet_name="Full_set")
 
 #print(Full_metrics[group]["checkOrderFiducials"])
