@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # Parameters
     # =========================================================
     targets = ["SBP", "DBP", "MAP"]
-    root_path = SHAP_RESULTS_PAPER / "Stratified_1variable"
+    root_path = SHAP_RESULTS_PAPER / "Stratified_1variable_Stress_Test"
     top_k = 10
 
     # =========================================================

@@ -17,7 +17,7 @@ import demo_strata_utils as ds
 from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER, SHAP_RESULTS_PAPER
 from data import load_PulseDB_sup_ds
 from models import build_lgbm
-from config import load_config
+from config import load_config, ExperimentConfig, stress_test_params
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from pathlib import Path
@@ -66,8 +66,15 @@ if __name__ == "__main__":
     #==========================================================
     
     # build the model
+    """
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
+    """
+    cfg = ExperimentConfig(n_splits=5,
+                           random_state=42, 
+                           experiment_name="Overfitted_Shap_stratified",
+                           verbose = -1,
+                           model_params=stress_test_params)
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -88,7 +95,7 @@ if __name__ == "__main__":
     # =========================================================
     # Shapley Analysis
     #==========================================================
-    strata_root = SHAP_RESULTS_PAPER / "Stratified_1variable"
+    strata_root = SHAP_RESULTS_PAPER / "Stratified_1variable_Stress_Test"
 
     for variable, strata_list in dfs_dict_train.items():
         ds.run_shap_experiment_stratified(
