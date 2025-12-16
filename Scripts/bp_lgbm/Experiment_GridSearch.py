@@ -20,6 +20,7 @@ import preprocessing
 import gs
 from pathlib import Path
 from local_paths import PULSE_DB_SUP_DIR
+from local_paths import GS_RESULT_PAPER
 from data import load_PulseDB_sup_ds
 from config import ExperimentConfig, lightGBM_default_params, save_config, lightGBM_full_grid_3target
 from sklearn.preprocessing import StandardScaler
@@ -46,10 +47,10 @@ if __name__ == "__main__":
                  "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
                  "FullSkew", "sdPRV", "IQR_PRV"]
     df = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
-    """
+    
     print(df.info())
     print(df.head())
-    """
+    
 
     # =========================================================
     # Check NaNs and fill them
@@ -72,8 +73,10 @@ if __name__ == "__main__":
     # =========================================================
     # Downsample the dataset --> balanced based on the subject
     #==========================================================
+    """
     df_downsampled = preprocessing.downsample_per_patient(df, patient_col="Subject", proportion = 0.1)
     print(df_downsampled.info())
+    """
     
     # =========================================================
     # Initialize model
@@ -83,14 +86,14 @@ if __name__ == "__main__":
     targets = ["SBP", "DBP", "MAP"]
     id_cols.extend(targets)
     print(id_cols)
-    groups = df_downsampled["Subject"]
-    Y_train = df_downsampled[targets]
-    X_train = df_downsampled.drop(columns=id_cols)
+    groups = df["Subject"]
+    Y_train = df[targets]
+    X_train = df.drop(columns=id_cols)
 
     # build the model
     cfg = ExperimentConfig(n_splits=5,
                            random_state=42, 
-                           experiment_name="SAMPLE_Full_Grid_Randomized_search_3targets",
+                           experiment_name="Full_Grid_Randomized_search_3targets_Full_DS",
                            verbose = -1,
                            model_params=lightGBM_default_params,
                            n_jobs=1)
@@ -113,9 +116,9 @@ if __name__ == "__main__":
                                             groups=groups,
                                             param_grid=lightGBM_full_grid_3target,
                                             n_splits=cfg.n_splits,
-                                            cv_type= "sample",
+                                            cv_type= "group",
                                             save_results=True,
-                                            verbose=-1,
+                                            verbose=0,
                                             search_mode="random",
                                             n_iter=50,
                                             scoring="neg_mean_squared_error",
@@ -132,4 +135,4 @@ if __name__ == "__main__":
 
     # Update config with best hyperparameters
     cfg.model_params.update(best_params_clean)
-    save_config(cfg, Path(f"configs/{cfg.experiment_name}.json"))
+    save_config(cfg, Path(GS_RESULT_PAPER / f"{cfg.experiment_name}.json"))
