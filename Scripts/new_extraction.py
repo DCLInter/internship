@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import h5py
 
+
+###### OBSOLETO
 data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:

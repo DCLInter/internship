@@ -71,6 +71,7 @@ class Cleaner:
 
         remove = self.remove
         clean_data = data
+        
         for patient in remove.keys():
             print(patient)
             sig_rem = np.array(remove[patient])

@@ -5,7 +5,7 @@ import h5py
 from bp_lgbm.local_paths import PULSE_DB_SUP_DIR
 
 data_path = PULSE_DB_SUP_DIR / "VitalDB_Train_Subset.h5"
-#data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
+#data_path = 'VitalDB_Train_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -38,11 +38,10 @@ for i in range(0, len(splits)-1):
 
     features_means, features_medians, fiducial_points = ftext.feature_extraction(save=False)
     df = features_means["P1"].T
-    #print(df)
+    
     df.index = df["segment_ID"]
     df.drop(columns=["segment_ID"], inplace=True)
     df = df.T
-    #print(df)
 
     # Convert into dictionaries and then append it
     dict_feat = df.to_dict(orient="list")
@@ -55,6 +54,9 @@ for i in range(0, len(splits)-1):
     # Convert into dictionaries and then append it
     dict_fid = df_fidu.to_dict(orient="list")
     fiducials_list.append(dict_fid)
+
+features = df.index.tolist()
+fiducials = df_fidu.index.tolist()
 
 # later: rebuild DataFrames and concat
 dfs_feat = [pd.DataFrame(d) for d in features_list]
@@ -75,9 +77,9 @@ with h5py.File('Features_VitalDB_Train_Subset.h5', 'w') as f:
         if g == "PPG" or g == "ABP":
             continue
         f.create_dataset(g, data=data[g].T)
-    group = f.create_group("PPG_features")
-    group.create_dataset("Features", data= final_feat_df.to_numpy(dtype=np.float64, na_value=np.nan))
-    
+    dst = f.create_dataset("PPG_features", data= final_feat_df.to_numpy(dtype=np.float64, na_value=np.nan))
+    dst.attrs["Feature_Names"] = np.array(features, dtype="S")
+
 with h5py.File('Fiducial_Points_VitalDB_Train_Subset.h5', 'w') as f:
-    group = f.create_group("PPG_fiducial_points")
-    group.create_dataset("Fiducials", data= final_fid_df.to_numpy(dtype=np.float64, na_value=np.nan))
+    dst = f.create_dataset("PPG_fiducial_points", data= final_fid_df.to_numpy(dtype=np.float64, na_value=np.nan))
+    dst.attrs["Fiducial_points"] = np.array(fiducials, dtype="S")

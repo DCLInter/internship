@@ -4,11 +4,10 @@ import h5py
 import numpy as np
 import pandas as pd
 
-path_fiducials = "D:/U/Practicas_City_University_of_London/Data/Fiducial_Points_VitalDB_CalFree_Test_Subset.h5"
-path_originalData = "D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_CalFree_Test_Subset.h5"
-filename_report = "D:/U/Practicas_City_University_of_London/Data/Thresholds_90/metrics_VitalDB_CalFree_Test_Subset_90_2.h5"
-filename_cleanData = "D:/U/Practicas_City_University_of_London/Data/Thresholds_80/Clean_Features_VitalDB_CalFree_Test_Subset_90_2.h5"
-filename_csvReport = "general_report.csv"
+path_fiducials = "Fiducial_Points_VitalDB_CalFree_Test_Subset.h5"
+path_originalData = "Features_VitalDB_CalFree_Test_Subset.h5"
+filename_report = "metrics_VitalDB_CalFree_Test_Subset_90_2.h5"
+filename_cleanData = "Clean_Features_VitalDB_CalFree_Test_Subset_90.h5"
 
 ################## CHECKER ##################
 thresholds = {
@@ -21,7 +20,9 @@ thresholds = {
             "thresScores":90
             }
 
+# Reading the fiducial points data
 data = {}
+attributes = {}
 with h5py.File(path_fiducials, 'r') as f:
     for group_name in f:
         obj = f[group_name]
@@ -32,12 +33,16 @@ with h5py.File(path_fiducials, 'r') as f:
             data[group_name] = {}
             for dst in group:
                 data[group_name][dst] = group[dst][()]
+            features = list(group[dst].attrs.items())  
 
-data_ext = {}
-segment_ids = {}
+# splits to process the data in parts, useful for data that exceeds 50k signals 
+# (the class will go significantly slower if the number of signals is very high)
 splits = [0,data["PPG_fiducial_points"]["Fiducials"].shape[1]]
 #splits = [0,50000,100000,150000,200000,250000,300000,350000,400000,data["PPG_fiducial_points"]["Fiducials"].shape[1]]
-#splits = [0,20,40,60,80,100]
+
+# Adapting the data to the format required by the Checker class
+data_ext = {}
+segment_ids = {}
 for i in range(0, len(splits)-1):
     data_ext[f"P{splits[i]}"] = {}
     data_ext[f"P{splits[i]}"]["segments"] = data["PPG_fiducial_points"]["Fiducials"][:,splits[i]:splits[i+1]]
@@ -45,27 +50,25 @@ for i in range(0, len(splits)-1):
     
 print(data_ext.keys())
 print(data_ext["P0"]["segments"].shape)
-features_names = ["IPR", "Tsp", "TWRRF25", "TWRRF50", "Tsw25", "Tsw50", "Tsw75", "Tdw25", "Tdw50", "Tdw75", "AUCpi", "IPA",  "Av-Au ratio", "Ab-Aa ratio", "Ac-Aa ratio", "Ad-Aa ratio", "Ap2-Ap1 ratio", "AGI", "Kurtosis", "Skewness", "L-H ratio", "ShannonEntropy", "Tpp"]
 demo_info = {}
 Nsamples = {}
 for group in data_ext.keys():
     demo_info[group] = {"SamplingFrequency": 125}
     Nsamples[group] = 1250
 
-ck = Checker(thresholds, data_ext=data_ext, features_names=features_names, demo_info=demo_info, samples=Nsamples, ids=segment_ids)
-
+ck = Checker(thresholds, data_ext=data_ext, demo_info=demo_info, samples=Nsamples, ids=segment_ids)
 Count_fiducials_problems = {}
 for group in data_ext.keys():
     dictScore = ck.metrics(patient=group)
     dictResults = ck.results(patient=group)
-    
-    # Extra data to report some stats on the problems found with the fiducials
+
+    ###### Extra data to report some stats on the problems found with the fiducials
     fiducials_problematic = dictScore["percentageProblematicFiducials"]
     dataframe_storage = pd.DataFrame(columns=["Ratio (%)"],index=fiducials_problematic.keys())
     for fp in fiducials_problematic.keys():
         dataframe_storage.loc[fp,"Ratio (%)"] = np.mean(fiducials_problematic[fp])
     Count_fiducials_problems[group] = dataframe_storage
-
+############ Extra ############
 Problems_full_set = pd.DataFrame(index=["Ratio (%)"],columns=ck.fiducial_order)
 y = pd.DataFrame()
 for group in Count_fiducials_problems.keys():
@@ -77,12 +80,15 @@ for fidu in ck.fiducial_order:
     Problems_full_set.loc["Ratio (%)",fidu] = np.mean(y[fidu])
 print(Problems_full_set)
 
-with pd.ExcelWriter("D:/U/Practicas_City_University_of_London/Data/Problems_Fiducials_VitalDB_CalFree_Test_Subset.xlsx") as writer:
+with pd.ExcelWriter("Problems_Fiducials.xlsx") as writer:
     Problems_full_set.to_excel(writer,sheet_name="Full_set")
+############ ############
 
+##### Generate report and saving in a h5 file
 print(ck.df_results.keys(), ck.resultsMetrics.keys())
 ck.report()
 results = ck.df_results
+# Adapting the results to a singular dataframe to follow the format used with this data
 complete_df = pd.DataFrame()
 for k in results:
     complete_df = pd.concat([complete_df,results[k]])
@@ -125,6 +131,9 @@ c = Cleaner(filename_report)
 dictFlags = c.detect()
 remove = c.remove
 clean_data = c.clean(data_ext=data_ext)
+# The for loop bellow is to clean the other datasets in te file
+# the clean() method only cleans the datasets used for the checking
+# the clean_dataset() method cleans any type of dataset given the ids to remove 
 for k in data_ext:
     if k not in remove.keys():
         clean_data[k] = c.clean_dataset(dataset=data_ext[k],ids_remove=remove[list(remove.keys())[0]])
@@ -139,8 +148,10 @@ with h5py.File(filename_cleanData, 'w') as f:
             continue
         else:
             f.create_dataset(g, data=clean_data[g].T.to_numpy())
-    f.create_dataset("PPG_Features", data=clean_data["Full_set"]["Features"].T.to_numpy(dtype=np.float64, na_value=np.nan))
+    dst = f.create_dataset("PPG_Features", data=clean_data["Full_set"]["Features"].T.to_numpy(dtype=np.float64, na_value=np.nan))
+    dst.attrs["Feature_Names"] = np.array(features, dtype="S")
 
+### Extra: Demographic info and resume of the cleaning
 info = ["Age","Height","Weight","Total signals","Removed signals","Percentage removed (%)"]
 demo_info = pd.DataFrame(columns=info)
 
@@ -169,4 +180,4 @@ for id in unique_id:
     demo_info.loc[id,"Percentage removed (%)"] = (rem/total)*100
                 
 print(demo_info)
-demo_info.to_excel("D:/U/Practicas_City_University_of_London/Data/Thresholds_80/Demographic_Info_VitalDB_CalFree_Test_Subset_90.xlsx")
+demo_info.to_excel("Demographic_Info.xlsx")
