@@ -1,4 +1,4 @@
-from checker_copy import Checker
+from checker import Checker
 from cleaning import Cleaner
 import h5py
 import numpy as np
@@ -50,6 +50,10 @@ for i in range(0, len(splits)-1):
     
 print(data_ext.keys())
 print(data_ext["P0"]["segments"].shape)
+
+# Aditional information required by the Checker class (number of samples, and sampling frecuency)
+# The sampling frequency goes in a dictionary called "demo_info" where can be added more information that will appear in the final .h5 files
+
 demo_info = {}
 Nsamples = {}
 for group in data_ext.keys():
@@ -58,10 +62,11 @@ for group in data_ext.keys():
 
 ck = Checker(thresholds, data_ext=data_ext, demo_info=demo_info, samples=Nsamples, ids=segment_ids)
 Count_fiducials_problems = {}
+
 for group in data_ext.keys():
     dictScore = ck.metrics(patient=group)
     dictResults = ck.results(patient=group)
-
+    
     ###### Extra data to report some stats on the problems found with the fiducials
     fiducials_problematic = dictScore["percentageProblematicFiducials"]
     dataframe_storage = pd.DataFrame(columns=["Ratio (%)"],index=fiducials_problematic.keys())
@@ -82,9 +87,9 @@ print(Problems_full_set)
 
 with pd.ExcelWriter("Problems_Fiducials.xlsx") as writer:
     Problems_full_set.to_excel(writer,sheet_name="Full_set")
-############ ############
+########### ############
 
-##### Generate report and saving in a h5 file
+#### Generate report and saving in a h5 file
 print(ck.df_results.keys(), ck.resultsMetrics.keys())
 ck.report()
 results = ck.df_results
@@ -97,7 +102,7 @@ complete_results = {"Full_set": complete_df}
 ck.df_results = complete_results
 ck.h5format(filename_report)
 
-################## CLEANING ##################
+################# CLEANING ##################
 data2 = {}
 segment_ids = {}
 

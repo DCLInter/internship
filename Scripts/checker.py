@@ -77,6 +77,7 @@ class Checker:
                 lowsp.append(sig)
 
             wrongOrd, numFlags, winFlags, probelmPerc = metrics.checkOrder(sig)
+
             for f in probelmPerc.keys():
                 problemsPercentageFiducials[f].append(probelmPerc[f])
             

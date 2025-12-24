@@ -22,7 +22,7 @@ def plot(signal,peaks,valleys,show: bool =False, delay: int = 1):
 
 data = {}
 segment_ids = {}
-data_path = "D:/U/Practicas_City_University_of_London/Data/patient_data.h5"
+data_path = "patient_data.h5"
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
         group = f[group_name]

@@ -59,6 +59,11 @@ class Metrics:
 
         return flag
     
+    def extra(self):
+        fp_c = np.array(self.fiducials["c"])
+        fp_d = np.array(self.fiducials["d"])
+        if np.array_equal(fp_c, fp_d):
+            return True
     def checkOrder(self, signal):
         lppg = ["on","sp","dn","dp","off"]
         ld1 = ["u","v","w"]
@@ -134,7 +139,6 @@ class Metrics:
         
         for fp in flags.keys():
             percentage_flags_perWindow[fp] = (len(flags[fp])/self.fiducials.shape[0])*100
-
 
         ### dic_flags: dictionary with the fiducial points as keys and the signals that have problems with the order as values
         ### numFlagFidu: total number of fiducial points (including all 16 different fiducials) that have problems with the order in the signal

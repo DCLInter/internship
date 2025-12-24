@@ -4,7 +4,7 @@ import pandas as pd
 import h5py
 
 ####### Only Fiducial Extraction for the Test Subset ########
-data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_CalFree_Test_Subset.h5'
+data_path = 'VitalDB_CalFree_Test_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -33,7 +33,7 @@ df_fidu.drop(columns=["segment_ID"], inplace=True)
 df_fidu = df_fidu.T
 df_fidu = df_fidu.replace({pd.NA: np.nan})
 
-with h5py.File('D:/U/Practicas_City_University_of_London/Data/Fiducial_Points_VitalDB_CalFree_Test_Subset.h5', 'w') as f:
+with h5py.File('Fiducial_Points_VitalDB_CalFree_Test_Subset.h5', 'w') as f:
     for k in data.keys():
         f.create_dataset(k, data=data[k].T)
     fiducials = f.create_dataset("PPG_fiducial_points", data= df_fidu.to_numpy(dtype=np.float64, na_value=np.nan))
