@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from metrics_functions import Metrics
 class Checker:
-    def __init__(self, threshold: dict = {}, data_ext: dict = {}, features_names: list = [], demo_info: dict = {}, samples: dict = {}, ids: dict = {}):
+    def __init__(self, threshold: dict = {}, data_ext: dict = {}, demo_info: dict = {}, samples: dict = {}, ids: dict = {}):
 
         self.ids = ids.copy()
         self.demo_info = demo_info.copy()
@@ -13,7 +13,6 @@ class Checker:
         self.threshold = threshold
         self.data = data_ext.copy()
         self.fiducial_order = ['on','sp','dn','dp','off','u','v','w','a','b','c','d','e','f','p1','p2']  ### Order of
-        self.features_names = features_names
 
     def windows(self, fiducials: pd.DataFrame, signal = None):
 
@@ -78,6 +77,7 @@ class Checker:
                 lowsp.append(sig)
 
             wrongOrd, numFlags, winFlags, probelmPerc = metrics.checkOrder(sig)
+
             for f in probelmPerc.keys():
                 problemsPercentageFiducials[f].append(probelmPerc[f])
             
