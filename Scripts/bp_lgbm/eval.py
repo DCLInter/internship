@@ -19,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from pathlib import Path
 
 # ----------------------------
@@ -118,6 +118,42 @@ def r2_plot(y_true: np.ndarray, y_pred: np.ndarray, path: str = "r2_plot.png"):
     return r2
 
 
+def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    """
+    Compute evaluation metrics without generating any plots.
+
+    Mirrors the scalar outputs of evaluate(). Use this inside bootstrap
+    loops where generating plots for every resample is undesirable.
+
+    Parameters
+    ----------
+    y_true, y_pred : np.ndarray
+        Ground-truth and predicted values.
+
+    Returns
+    -------
+    dict of scalar metrics (no plot paths).
+    """
+    errors   = y_pred - y_true
+    abs_errors = np.abs(errors)
+    bias = float(np.mean(errors))
+    sd   = float(np.std(errors, ddof=1))
+
+    return {
+        "MAE":        float(mean_absolute_error(y_true, y_pred)),
+        "MAE_SD":     float(np.std(abs_errors, ddof=1)),
+        "ME":         bias,
+        "SDE":        sd,
+        "MSE":        float(mean_squared_error(y_true, y_pred)),
+        "RMSE":       float(np.sqrt(mean_squared_error(y_true, y_pred))),
+        "R2":         float(r2_score(y_true, y_pred)),
+        "BA_bias_ME": bias,
+        "BA_sd_diff": sd,
+        "BA_loa_low":  float(bias - 1.96 * sd),
+        "BA_loa_high": float(bias + 1.96 * sd),
+    }
+
+
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str) -> Dict[str, float]:
     """
     Compute requested metrics:
@@ -166,6 +202,164 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray, R2_path: str, BA_path: str)
     }
 
     return metrics
+
+def allocate_bootstrap_resamples(
+    groups,
+    n_resamples: int = 1000,
+    random_state: int = 42
+) -> list:
+    """
+    Pre-allocate subject ID lists for bootstrap resampling (with replacement).
+
+    Sampling is subject-level to preserve within-subject signal correlation.
+    Each resample contains the same number of subjects as the original set,
+    drawn with replacement (so some subjects may appear multiple times).
+
+    Parameters
+    ----------
+    groups : array-like of shape (n_samples,)
+        Subject IDs aligned with the dataset rows (e.g. X["Subject"]).
+    n_resamples : int, default=1000
+        Number of bootstrap resamples to pre-allocate.
+    random_state : int, default=42
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    resamples : list of np.ndarray, length n_resamples
+        Each entry is an array of subject IDs sampled with replacement,
+        of length equal to the number of unique subjects.
+    """
+    rng = np.random.default_rng(random_state)
+    unique_subjects = np.unique(groups)
+    n_subjects = len(unique_subjects)
+
+    return [
+        rng.choice(unique_subjects, size=n_subjects, replace=True)
+        for _ in range(n_resamples)
+    ]
+
+
+def build_subject_index(df: pd.DataFrame, subject_col: str = "Subject") -> Dict:
+    """
+    Precompute a subject → row-label index mapping for fast bootstrap sampling.
+
+    Call this once on the test set before the bootstrap loop; pass the result
+    to build_bootstrap_sample on every iteration.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset to index (typically the test set).
+    subject_col : str, default="Subject"
+        Column name identifying subjects.
+
+    Returns
+    -------
+    dict mapping subject_id → np.ndarray of df index labels
+    """
+    return {
+        subject_id: idx.to_numpy()
+        for subject_id, idx in df.groupby(subject_col).groups.items()
+    }
+
+
+def build_bootstrap_sample(
+    df: pd.DataFrame,
+    resample,
+    subject_index: Dict,
+) -> pd.DataFrame:
+    """
+    Build one bootstrap sample using a precomputed subject index.
+
+    Subjects that appear multiple times in `resample` have their rows
+    duplicated accordingly, preserving within-subject signal structure.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Full test set (same one passed to build_subject_index).
+    resample : array-like of subject IDs
+        One entry from allocate_bootstrap_resamples().
+    subject_index : dict
+        Output of build_subject_index — subject_id → row label array.
+
+    Returns
+    -------
+    pd.DataFrame
+        Resampled dataset with reset index.
+    """
+    idx = np.concatenate([subject_index[s] for s in resample])
+    return df.loc[idx].reset_index(drop=True)
+
+
+def compute_bootstrap_ci(
+    distribution: pd.DataFrame,
+    alpha: float = 0.05,
+) -> pd.DataFrame:
+    """
+    Compute bootstrap confidence intervals from a distribution of metric values.
+
+    Input-agnostic: works on any DataFrame where each row is one bootstrap
+    resample and each column is a metric — whether those are raw evaluation
+    metrics or paired differences between models.
+
+    Parameters
+    ----------
+    distribution : pd.DataFrame
+        Shape (n_resamples, n_metrics). Typically loaded from a
+        Distribution_{target}.csv saved by Experiment_Bootstrap.py.
+    alpha : float, default=0.05
+        Significance level. 0.05 → 95% CI.
+
+    Returns
+    -------
+    pd.DataFrame with columns:
+        metric, ci_lower, ci_upper, bootstrap_mean, bootstrap_std
+    """
+    rows = []
+    for col in distribution.columns:
+        values = distribution[col].values
+        rows.append({
+            "metric":         col,
+            "ci_lower":       float(np.percentile(values, 100 * alpha / 2)),
+            "ci_upper":       float(np.percentile(values, 100 * (1 - alpha / 2))),
+            "bootstrap_mean": float(np.mean(values)),
+            "bootstrap_std":  float(np.std(values, ddof=1)),
+        })
+    return pd.DataFrame(rows)
+
+
+def save_bootstrap_ci(
+    ci_df: pd.DataFrame,
+    path,
+    point_metrics: dict = None,
+) -> None:
+    """
+    Save a CI DataFrame to CSV, optionally inserting point estimates.
+
+    Parameters
+    ----------
+    ci_df : pd.DataFrame
+        Output of compute_bootstrap_ci.
+    path : str or Path
+        Destination CSV path. Parent directory is created if needed.
+    point_metrics : dict, optional
+        {metric_name: scalar_value} from evaluation on the full test set
+        (no resampling). Pass None to omit the point_estimate column —
+        useful for paired-difference CIs where there is no single point
+        estimate.
+    """
+    ci_df = ci_df.copy()
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if point_metrics is not None:
+        ci_df.insert(1, "point_estimate", ci_df["metric"].map(point_metrics))
+
+    ci_df.to_csv(path, index=False)
+    print(f"✅ Saved: {path}")
+
 
 def save_results_dict(res_dict: dict, save_path: str, subset_col: str = "subset"):
     """

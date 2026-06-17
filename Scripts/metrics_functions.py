@@ -32,16 +32,6 @@ class Metrics:
         self.fiducials_times = fd_t
         self.fiducials_tdiff = fd_td
         self.mTFP = m
-
-        # for fp in self.fiducials.keys():
-        #     a = self.fiducials[fp]/self.fs
-        #     ### Checks if any of the fiducials wasnt detected
-        #     if (a.isna()).any():
-        #         continue
-
-        #     self.fiducials_times[fp] = np.array(a,dtype=float) ### The temporal position of the fp in seconds
-        #     self.fiducials_tdiff[fp] = np.round(np.diff(self.fiducials_times[fp]),6) ### time between the fp
-        #     self.mTFP[fp] = np.mean(self.fiducials_tdiff[fp])
     
     def checkNA(self):
         flag = 0
@@ -69,7 +59,12 @@ class Metrics:
 
         return flag
     
-    def checkOrder(self, patient: str, signal):
+    def extra(self):
+        fp_c = np.array(self.fiducials["c"])
+        fp_d = np.array(self.fiducials["d"])
+        if np.array_equal(fp_c, fp_d):
+            return True
+    def checkOrder(self, signal):
         lppg = ["on","sp","dn","dp","off"]
         ld1 = ["u","v","w"]
         ld2 = ["a","b","c","d","e","f"]
@@ -81,11 +76,14 @@ class Metrics:
         flags = {}
         numPerDerivatives = {}
         dic_flags = {}
+        percentage_flags_perWindow = {}
+
         for listfp in l:
             fld = 0
             for fidu in listfp:
                 if fidu not in dic_flags:
                     dic_flags[fidu] = []
+
                 ind = listfp.index(fidu)
                 p0 = self.fiducials[listfp[ind]]
                 p = self.fiducials[listfp[ind-1]] if ind > 0 else p0
@@ -136,10 +134,16 @@ class Metrics:
             cont = 0
             for fp in flags.keys():
                 if (flags[fp] == win).any():
-                    cont +=1
+                    cont +=1  
             winOverlap["win"+str(win)] = cont
+        
+        for fp in flags.keys():
+            percentage_flags_perWindow[fp] = (len(flags[fp])/self.fiducials.shape[0])*100
 
-        return dic_flags, numFlagFidu, winOverlap
+        ### dic_flags: dictionary with the fiducial points as keys and the signals that have problems with the order as values
+        ### numFlagFidu: total number of fiducial points (including all 16 different fiducials) that have problems with the order in the signal
+        ### winOverlap: dictionary with the windows as keys and the number of fiducial points that have problems in that window as values
+        return dic_flags, numFlagFidu, winOverlap, percentage_flags_perWindow
     
     def checkHR(self):
 

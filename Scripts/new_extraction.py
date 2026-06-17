@@ -3,7 +3,9 @@ import numpy as np
 import pandas as pd
 import h5py
 
-data_path = 'D:/U/Practicas_City_University_of_London/Data/VitalDB_Train_Subset.h5'
+
+###### OBSOLETO
+data_path = 'VitalDB_Train_Subset.h5'
 data = {}
 with h5py.File(data_path, 'r') as f:
     for group_name in f:
@@ -107,7 +109,7 @@ df5_fidu = fiducial_points["P1"].T
 df5_fidu.drop(columns=["segment_ID"], inplace=True)
 df5_fidu = df5_fidu.T
 
-with h5py.File('D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_Train_Subset.h5', 'w') as f:
+with h5py.File('Features_VitalDB_Train_Subset.h5', 'w') as f:
     for g in data.keys():
         if g == "PPG" or g == "ABP":
             continue
@@ -119,7 +121,7 @@ with h5py.File('D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_T
     group.create_dataset("Fourth_100k", data= df4.to_numpy(dtype=np.float64, na_value=np.nan))
     group.create_dataset("Last_data", data= df5.to_numpy(dtype=np.float64, na_value=np.nan))
 
-with h5py.File('D:/U/Practicas_City_University_of_London/Data/Fiducial_Points_VitalDB_Train_Subset.h5', 'w') as f:
+with h5py.File('Fiducial_Points_VitalDB_Train_Subset.h5', 'w') as f:
     group = f.create_group("PPG_fiducial_points")
     group.create_dataset("First_100k", data= df_fidu.to_numpy(dtype=np.float64, na_value=np.nan))
     group.create_dataset("Second_100k", data= df2_fidu.to_numpy(dtype=np.float64, na_value=np.nan))

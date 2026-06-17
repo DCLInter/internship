@@ -3,7 +3,7 @@ import pandas as pd
 import h5py
 
 from fearture_extraction import Feature_Extraction
-from checker import Checker
+from Scripts.checker_old import Checker
 from cleaning import Cleaner
 
 ''' The feature extraction and statistical analysis process its the most time consuming 

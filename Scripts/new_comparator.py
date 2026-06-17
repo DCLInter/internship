@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 from comparator import Comparator
 
-path_features = "D:/U/Practicas_City_University_of_London/Data/Features_VitalDB_Train_Subset.h5"
-path_cleaned = "D:/U/Practicas_City_University_of_London/Data/Clean_Features_VitalDB_Train_Subset_80.h5"
-filepath_results = "D:/U/Practicas_City_University_of_London/Data"
+path_features = "Features_VitalDB_Train_Subset.h5"
+path_cleaned = "Clean_Features_VitalDB_Train_Subset_90.h5"
+filepath_results = "Data" # Path to a folder
 data = {}
 with h5py.File(path_features, 'r') as f:
     for group_name in f:
@@ -40,7 +40,7 @@ data_clean_ext = {}
 data_clean_ext["Full_set"] = data_clean["PPG_Features"]
 #print(data_clean_ext["Full_set"])
 
-features_names = ["IPR", "Tsp", "TWRRF25", "TWRRF50", "Tsw25", "Tsw50", "Tsw75", "Tdw25", "Tdw50", "Tdw75", "AUCpi", "IPA",  "Av-Au ratio", "Ab-Aa ratio", "Ac-Aa ratio", "Ad-Aa ratio", "Ap2-Ap1 ratio", "AGI", "Kurtosis", "Skewness", "L-H ratio", "ShannonEntropy", "Tpp"]
+features_names = ['IPR', 'Tsp', 'TWRRF25', 'TWRRF50', 'Tsw25', 'Tsw50', 'Tsw75', 'Tdw25', 'Tdw50', 'Tdw75', 'AUCpi', 'IPA', 'Av-Au ratio', 'Ab-Aa ratio', 'Ac-Aa ratio', 'Ad-Aa ratio', 'Ap2-Ap1 ratio', 'AGI', 'Kurtosis', 'Skewness', 'L-H ratio', 'ShannonEntropy', 'Tpp', 'PRV', 'FullKurt', 'FullSkew', 'sdPRV', 'IQR_PRV']
 
 comp = Comparator(data_ext, data_clean_ext, feat_names=features_names, filepath_results=filepath_results)
 comp.extractResults()

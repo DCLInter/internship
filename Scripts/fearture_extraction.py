@@ -180,12 +180,10 @@ class Feature_Extraction():
             
             for sig in np.arange(len(data[i])): # Processing each signal
                 
-                print(sig)
                 signal.name = sig
                 signal.start_sig = 0
                 signal.end_sig = len(data[i][sig])
                 signal.v = data[i][sig]
-                print(signal.v, signal.v.shape)
                 signal.fs = int(demo_info[i]["SamplingFrequency"])
 
                 #### Preprocess the signal with pyPPG (filtering and acquires the derivatives)

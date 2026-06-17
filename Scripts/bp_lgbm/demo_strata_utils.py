@@ -7,6 +7,7 @@ import re
 import pandas as pd
 import numbers
 import itertools
+import shap_analysis as sa
 from preprocessing import split_XY
 from pathlib import Path
 from typing import List
@@ -304,6 +305,77 @@ def run_analysis_for_target(
     print(f"\n✅ Aggregated results for {target} saved to {agg_csv}")
 
     return df_all
+
+def run_shap_experiment_stratified(
+    strata_list,
+    variable_name: str,
+    output_root: Path,
+    targets: list,
+    pipeline,
+    n_iter: int = 30,
+    drop_cols: list = None,
+    group_col: str = "Subject",
+):
+    """
+    Run SHAP rank stability analysis for all strata of one demographic variable.
+
+    Parameters
+    ----------
+    strata_list : list of tuples
+        List of strata for one variable, e.g.
+        [("Age<30", df_sub1, n_rows, n_subjects), ("Age_30-45", df_sub2, ...), ...]
+    variable_name : str
+        Demographic variable name (e.g. "Age", "BMI", "Gender").
+    output_root : Path
+        Base folder to save results (e.g. SHAP_RESULTS_PAPER / "Demographic_Stratified").
+    targets : list of str
+        Target BP variables (e.g. ["SBP", "DBP", "MAP"]).
+    pipeline : sklearn.Pipeline
+        Pipeline containing preprocessing and model.
+    n_iter : int, default=30
+        Number of SHAP iterations.
+    drop_cols : list of str, optional
+        Columns to drop from X (IDs, demographics, targets, etc.).
+    group_col : str, default="Subject"
+        Column name for subject IDs.
+    """
+    drop_cols = drop_cols or []
+
+    print(f"\n📊 Running SHAP experiments for variable: {variable_name}")
+    variable_dir = output_root / variable_name
+    variable_dir.mkdir(parents=True, exist_ok=True)
+
+    for stratum_label, df_subset, n_rows, n_subjects in strata_list:
+        print(f"▶️  {variable_name} - {stratum_label} ({n_subjects} subjects, {n_rows} rows)")
+
+        # --- Prepare subset output folder ---
+        stratum_dir = variable_dir / sanitize_label(stratum_label)
+        stratum_dir.mkdir(parents=True, exist_ok=True)
+
+        # --- Define groups, features, and targets ---
+        groups = df_subset[group_col]
+        id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"] + targets
+        id_cols = [c for c in id_cols if c in df_subset.columns]
+        id_cols = list(set(id_cols) | set(drop_cols))
+        X = df_subset.drop(columns=id_cols, errors="ignore")
+
+        for target in targets:
+            y = df_subset[target]
+            print(f"   ⚙️  Running SHAP for {target} ...")
+
+            try:
+                sa.shap_rank_stability(
+                    pipeline=pipeline,
+                    X=X,
+                    y=y,
+                    groups=groups,
+                    n_iter=n_iter,
+                    save_path=stratum_dir / target
+                )
+            except Exception as e:
+                print(f"   ❌ Failed for {target} in {variable_name}-{stratum_label}: {e}")
+
+    print(f"✅ Completed SHAP analysis for {variable_name}")
 
 # -------------------------------------------------------
 # HELPER

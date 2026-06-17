@@ -1,6 +1,6 @@
 ############ EXPERIMENT SHAPLEY VALUES ########################
 #                                                             #
-# Here, the mutual information experiment will be performed   #
+# Here, the Shap values experiment will be performed          #
 #                                                             #
 ###############################################################
 """
@@ -16,7 +16,7 @@ import shap_analysis as sa
 from local_paths import PULSE_DB_SUP_DIR, GS_RESULT_PAPER, SHAP_RESULTS_PAPER
 from data import load_PulseDB_sup_ds
 from models import build_lgbm
-from config import load_config
+from config import ExperimentConfig, load_config, stress_test_params
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from pathlib import Path
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # =========================================================
     # Paths
     #==========================================================
-    train_original_path = PULSE_DB_SUP_DIR / "Clean_Features_VitalDB_Train_Subset_90.h5"
+    train_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_Train_Subset.h5"
 
     # =========================================================
     # Load Data
@@ -70,8 +70,16 @@ if __name__ == "__main__":
     print(df_train.info())
     """
     # build the model
+    """
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
+    """
+    cfg = ExperimentConfig(n_splits=5,
+                           random_state=42, 
+                           experiment_name="Aggressive_fit_shap_Original_ds",
+                           verbose = -1,
+                           model_params=stress_test_params)
+    
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -82,7 +90,7 @@ if __name__ == "__main__":
 
     # Splitting and dropping
     id_cols = ["Subject", "Age", "Gender", "Height", "Weight", "BMI", "SF"]
-    targets = ["SBP", "DBP", "MAP"]
+    targets = ["MAP"] #["SBP", "DBP", "MAP"]
     id_cols.extend(targets)
     groups = df_train["Subject"]
     X_train = df_train.drop(columns=id_cols)
@@ -92,7 +100,7 @@ if __name__ == "__main__":
     # =========================================================
     # Shapley Analysis
     #==========================================================
-    Shap_path = SHAP_RESULTS_PAPER/"Clean_90_DS"
+    Shap_path = SHAP_RESULTS_PAPER/"StressTest_Original"
 
     for target in targets:
         Y_t = Y_train[target]
