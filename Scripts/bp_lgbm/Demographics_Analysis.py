@@ -34,6 +34,18 @@ if __name__ == "__main__":
     print(df_train.head())
     print(df_test.head())
 
+    cols = ["Age", "BMI", "SBP", "DBP", "MAP"]
+
+    summary_train = df_train[cols].agg(["mean", "std"]).T
+    summary_train = summary_train.rename(columns={"mean": "Mean", "std": "SD"})
+
+    summary_test = df_test[cols].agg(["mean", "std"]).T
+    summary_test = summary_test.rename(columns={"mean": "Mean", "std": "SD"})
+
+    print("Training: \n", summary_train)
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Testing: \n", summary_test)
+
     # =========================================================
     # Distribution Plots
     #==========================================================
@@ -57,6 +69,8 @@ if __name__ == "__main__":
     # =========================================================
     # Stratification
     #==========================================================
+    """
     subsets_dfs = ds.segment_multilabel_thresholds(df_train, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
     subsets_dfs_test = ds.segment_multilabel_thresholds(df_test, rules=thresholds, subject_col_name="Subject", verbose = True, skip_empty= False)
     print(subsets_dfs.keys())
+    """
