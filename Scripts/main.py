@@ -26,8 +26,8 @@ def main():
 
     thresholds = {
                 "sp_limit":2,
-                "bmin":50,
-                "bmax":180,
+                "bmin":40,
+                "bmax":200,
                 "w_consistency":0.25,
                 "w_alignment":0.75,
                 "thresFiducials":80,
