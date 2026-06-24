@@ -6,6 +6,7 @@
 # Gender is passed as a pandas Categorical — LightGBM native support. #
 ########################################################################
 
+import numpy as np
 import preprocessing
 import eval
 from pathlib import Path
@@ -40,6 +41,13 @@ if __name__ == "__main__":
     df_test  = load_PulseDB_sup_ds(test_path,  feature_names=feature_names)
 
     # =========================================================
+    # Config (loaded early so random_state is available for splits)
+    # =========================================================
+    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
+    cfg = load_config(grid_path)
+    np.random.seed(cfg.random_state)
+
+    # =========================================================
     # Impute
     # =========================================================
     df_train = preprocessing.median_impute_patientwise(df_train, patient_col="Subject")
@@ -67,12 +75,12 @@ if __name__ == "__main__":
     # =========================================================
     X_train, X_val, Y_train, Y_val = train_test_split(
         X_train_full, Y_train_full,
-        test_size=0.1, random_state=42, shuffle=True,
+        test_size=0.1, random_state=cfg.random_state, shuffle=True,
         stratify=X_train_full["Subject"],
     )
     _, X_sub_train, _, Y_sub_train = train_test_split(
         X_train, Y_train,
-        test_size=0.1, random_state=42, shuffle=True,
+        test_size=0.1, random_state=cfg.random_state, shuffle=True,
         stratify=X_train["Subject"],
     )
 
@@ -83,8 +91,6 @@ if __name__ == "__main__":
     # =========================================================
     # Model
     # =========================================================
-    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
-    cfg  = load_config(grid_path)
     lgbm = build_lgbm(cfg)
 
     # =========================================================

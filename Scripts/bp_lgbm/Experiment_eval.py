@@ -3,6 +3,7 @@
 # Here, the mutual information experiment will be performed   #
 #                                                             #
 ###############################################################
+import numpy as np
 import preprocessing
 import eval
 from pathlib import Path
@@ -27,6 +28,13 @@ if __name__ == "__main__":
     test_clean_path_80 = PULSE_DB_SUP_DIR/ "Clean_Features_VitalDB_CalFree_Test_Subset_80.h5"
     test_original_path = PULSE_DB_SUP_DIR / "Features_VitalDB_CalFree_Test_Subset.h5"
     
+    # =========================================================
+    # Config (loaded early so random_state is available for splits)
+    # =========================================================
+    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
+    cfg = load_config(grid_path)
+    np.random.seed(cfg.random_state)
+
     # =========================================================
     # Load Data
     #==========================================================
@@ -97,7 +105,7 @@ if __name__ == "__main__":
     Y_test_90 = df_test_90[targets]
 
     # Splittin sample wise
-    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"]) # Cant stratify in the cleaned as dataset is quite imbalanced
+    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state=cfg.random_state, shuffle=True, stratify=X_train["Subject"]) # Cant stratify in the cleaned as dataset is quite imbalanced
     """
     counts = X_val["Subject"].value_counts()
     print(counts)
@@ -105,7 +113,7 @@ if __name__ == "__main__":
     #-----------------------------------------
     # Just for diagnosing the model
     #-----------------------------------------
-    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
+    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state=cfg.random_state, shuffle=True, stratify=X_train["Subject"])
 
     X_train = X_train.drop(columns=["Subject"])
     X_val = X_val.drop(columns=["Subject"])
@@ -115,8 +123,6 @@ if __name__ == "__main__":
     X_sub_train = X_sub_train.drop(columns=["Subject"])
 
     # build the model
-    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
-    cfg = load_config(grid_path)
     lgbm = build_lgbm(cfg)
 
     # build the pipeline

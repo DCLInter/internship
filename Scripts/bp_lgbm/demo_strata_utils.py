@@ -199,6 +199,7 @@ def run_analysis_for_target(
     base_results_dir,
     drop_features: List[str] = None,
     multilabel_mode: bool = False,
+    random_state: int = 42,
 ):
     """
     Train and evaluate a model for one BP target across demographic subsets.
@@ -250,11 +251,11 @@ def run_analysis_for_target(
 
         # --- Train/val/leak splits ---
         X_train, X_val, Y_train, Y_val = train_test_split(
-            X_train, Y_train, test_size=val_split_size, random_state=42,
+            X_train, Y_train, test_size=val_split_size, random_state=random_state,
             shuffle=True, stratify=X_train["Subject"]
         )
         _, X_leak, _, Y_leak = train_test_split(
-            X_train, Y_train, test_size=train_subset_size, random_state=42,
+            X_train, Y_train, test_size=train_subset_size, random_state=random_state,
             shuffle=True, stratify=X_train["Subject"]
         )
 

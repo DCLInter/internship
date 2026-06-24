@@ -16,6 +16,7 @@ EXPERIMENT DESCRIPTION:
     for SBP and use the method above to calculate the DBP.
 
 """
+import numpy as np
 import preprocessing
 import gs
 from pathlib import Path
@@ -92,11 +93,12 @@ if __name__ == "__main__":
 
     # build the model
     cfg = ExperimentConfig(n_splits=5,
-                           random_state=42, 
+                           random_state=42,
                            experiment_name="Full_Grid_Randomized_search_3targets_Full_DS",
                            verbose = -1,
                            model_params=lightGBM_default_params,
                            n_jobs=1)
+    np.random.seed(cfg.random_state)
     lgbm = build_lgbm(cfg)
     model = MultiOutputRegressor(lgbm)
 
@@ -122,7 +124,8 @@ if __name__ == "__main__":
                                             search_mode="random",
                                             n_iter=50,
                                             scoring="neg_mean_squared_error",
-                                            n_jobs=-1
+                                            n_jobs=-1,
+                                            random_state=cfg.random_state,
                                             )
     
     print("Best parameters:", search.best_params_)
