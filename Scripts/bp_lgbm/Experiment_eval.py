@@ -36,7 +36,7 @@ if __name__ == "__main__":
                  "Ad-Aa_ratio", "Ap2-Ap1_ratio", "AGI", "Kurtosis", "Skewness", 
                  "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
                  "FullSkew", "sdPRV", "IQR_PRV"]
-    df_train = load_PulseDB_sup_ds(train_clean_path_90, feature_names=feature_names)
+    df_train = load_PulseDB_sup_ds(train_clean_path_80, feature_names=feature_names)
     df_test = load_PulseDB_sup_ds(test_original_path, feature_names=feature_names)
     df_test_90 = load_PulseDB_sup_ds(test_clean_path_90, feature_names=feature_names)
     df_test_80 = load_PulseDB_sup_ds(test_clean_path_80, feature_names=feature_names)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
         Y_t_90_pred = lgbm.predict(X_test_90)
 
         # Eval
-        Path_res = PERFORMANCE_RESULTS_PAPER / r"Clean_90_DS"
+        Path_res = PERFORMANCE_RESULTS_PAPER / r"Clean_80_DS"
         metrics_train = eval.evaluate(Y_tr, Y_pred_tr, 
                                              BA_path=Path_res / f"BA_train_subset_{target}.png",
                                              R2_path= Path_res / f"R2_train_subset_{target}.png")

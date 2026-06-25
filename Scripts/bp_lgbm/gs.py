@@ -28,7 +28,8 @@ def run_grid_search(
     verbose: int = 2,
     save_results: bool = False,
     search_mode="grid",
-    n_iter=100
+    n_iter=100,
+    random_state: int = 42,
 ):
     """
     Run grid search over a given pipeline with patient-wise (GroupKFold) or sample-wise (KFold) CV.
@@ -56,7 +57,7 @@ def run_grid_search(
         cv = GroupKFold(n_splits=n_splits)
         cv_split = cv.split(X, y, groups)
     elif cv_type == "sample":
-        cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+        cv = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
         cv_split = cv.split(X, y)
     else:
         raise ValueError("cv_type must be 'group' or 'sample'")
@@ -81,7 +82,7 @@ def run_grid_search(
             scoring=scoring,
             n_jobs=n_jobs,
             verbose=verbose,
-            random_state=42,
+            random_state=random_state,
             return_train_score = True
         )
     else:

@@ -199,6 +199,7 @@ def run_analysis_for_target(
     base_results_dir,
     drop_features: List[str] = None,
     multilabel_mode: bool = False,
+    random_state: int = 42,
 ):
     """
     Train and evaluate a model for one BP target across demographic subsets.
@@ -250,19 +251,21 @@ def run_analysis_for_target(
 
         # --- Train/val/leak splits ---
         X_train, X_val, Y_train, Y_val = train_test_split(
-            X_train, Y_train, test_size=val_split_size, random_state=42,
+            X_train, Y_train, test_size=val_split_size, random_state=random_state,
             shuffle=True, stratify=X_train["Subject"]
         )
+        """
         _, X_leak, _, Y_leak = train_test_split(
-            X_train, Y_train, test_size=train_subset_size, random_state=42,
+            X_train, Y_train, test_size=train_subset_size, random_state=random_state,
             shuffle=True, stratify=X_train["Subject"]
         )
+        """
 
         # --- Drop ID columns ---
-        for X in (X_train, X_val, X_leak, X_test):
+        for X in (X_train, X_val, X_test):# X_leak):
             if "Subject" in X.columns:
                 X.drop(columns=["Subject"], inplace=True)
-        for Y in (Y_train, Y_val, Y_leak, Y_test):
+        for Y in (Y_train, Y_val, Y_test):# Y_leak):
             if "Subject" in Y.columns:
                 Y.drop(columns=["Subject"], inplace=True)
 
@@ -271,7 +274,7 @@ def run_analysis_for_target(
         model.fit(X_train, Y_train)
 
         # --- Evaluate ---
-        datasets = {"train": (X_leak, Y_leak), "val": (X_val, Y_val), "test": (X_test, Y_test)}
+        datasets = {"train": (X_train, Y_train), "val": (X_val, Y_val), "test": (X_test, Y_test)}
         for dataset_name, (X, y_true) in datasets.items():
             if isinstance(y_true, pd.DataFrame):
                 y_true = y_true.squeeze().values

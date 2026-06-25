@@ -75,12 +75,12 @@ if __name__ == "__main__":
     #-----------------------------------------
     # Just for diagnosing the model
     #-----------------------------------------
-    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
+    #_, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
 
     X_train = X_train.drop(columns=["Subject"])
     X_val = X_val.drop(columns=["Subject"])
     X_test = X_test.drop(columns=["Subject"])
-    X_sub_train = X_sub_train.drop(columns=["Subject"])
+    #X_sub_train = X_sub_train.drop(columns=["Subject"])
 
     # build the model
     
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         Y_tr = Y_train[target]
         Y_v = Y_val[target]
         Y_t = Y_test[target]
-        Y_tr_sub = Y_sub_train[target]
+        #Y_tr_sub = Y_sub_train[target]
 
         # Train
         pipeline.fit(X_train, Y_tr)                              
@@ -119,11 +119,12 @@ if __name__ == "__main__":
         # Pred
         Y_val_pred = pipeline.predict(X_val)
         Y_pred = pipeline.predict(X_test)
-        Y_tr_sub_pred = pipeline.predict(X_sub_train)
+        Y_tr_pred = pipeline.predict(X_train)
+        #Y_tr_sub_pred = pipeline.predict(X_sub_train)
 
         # Eval
         Path_res = PERFORMANCE_RESULTS_PAPER / r"Stress_Test"
-        metrics_train = eval.evaluate(Y_tr_sub, Y_tr_sub_pred, 
+        metrics_train = eval.evaluate(Y_tr, Y_tr_pred, 
                                              BA_path=Path_res / f"BA_train_subset_{target}.png",
                                              R2_path= Path_res / f"R2_train_subset_{target}.png")
         metrics_val = eval.evaluate(Y_v, Y_val_pred, 

@@ -4,6 +4,7 @@
 #                                                             #
 ###############################################################
 
+import numpy as np
 import demo_strata_utils as ds
 import preprocessing
 import eval
@@ -77,10 +78,11 @@ if __name__ == "__main__":
     cfg = load_config(grid_path)
     """
     cfg = ExperimentConfig(n_splits=5,
-                           random_state=42, 
+                           random_state=42,
                            experiment_name="Stress_Test_Demographics",
                            verbose = -1,
                            model_params=stress_test_params)
+    np.random.seed(cfg.random_state)
     lgbm = build_lgbm(cfg)
 
     # build the pipeline
@@ -95,7 +97,7 @@ if __name__ == "__main__":
     # =========================================================
     # Call the loop for running the stratified analysis
     #==========================================================
-    path = DEMOG_RESULTS_PAPER/ r"Stress_Test_1variable"
+    path = DEMOG_RESULTS_PAPER#/ r"Stress_Test_1variable"
     for target in targets:
         df_results = ds.run_analysis_for_target(
             dfs_dict_train,
@@ -107,4 +109,5 @@ if __name__ == "__main__":
             evaluate_fn=eval.evaluate,
             base_results_dir=path,
             drop_features=drop_cols,
+            random_state=cfg.random_state,
         )

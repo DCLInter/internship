@@ -6,6 +6,7 @@
 # Gender is passed as a pandas Categorical — LightGBM native support. #
 ########################################################################
 
+import numpy as np
 import preprocessing
 import eval
 from pathlib import Path
@@ -40,6 +41,13 @@ if __name__ == "__main__":
     df_test  = load_PulseDB_sup_ds(test_path,  feature_names=feature_names)
 
     # =========================================================
+    # Config (loaded early so random_state is available for splits)
+    # =========================================================
+    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
+    cfg = load_config(grid_path)
+    np.random.seed(cfg.random_state)
+
+    # =========================================================
     # Impute
     # =========================================================
     df_train = preprocessing.median_impute_patientwise(df_train, patient_col="Subject")
@@ -67,24 +75,24 @@ if __name__ == "__main__":
     # =========================================================
     X_train, X_val, Y_train, Y_val = train_test_split(
         X_train_full, Y_train_full,
-        test_size=0.1, random_state=42, shuffle=True,
+        test_size=0.1, random_state=cfg.random_state, shuffle=True,
         stratify=X_train_full["Subject"],
     )
+    """
     _, X_sub_train, _, Y_sub_train = train_test_split(
         X_train, Y_train,
-        test_size=0.1, random_state=42, shuffle=True,
+        test_size=0.1, random_state=cfg.random_state, shuffle=True,
         stratify=X_train["Subject"],
     )
+    """
 
     X_train     = X_train.drop(columns=["Subject"])
     X_val       = X_val.drop(columns=["Subject"])
-    X_sub_train = X_sub_train.drop(columns=["Subject"])
+    #X_sub_train = X_sub_train.drop(columns=["Subject"])
 
     # =========================================================
     # Model
     # =========================================================
-    grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
-    cfg  = load_config(grid_path)
     lgbm = build_lgbm(cfg)
 
     # =========================================================
@@ -93,12 +101,13 @@ if __name__ == "__main__":
     for target in targets:
         lgbm.fit(X_train, Y_train[target])
 
-        Y_tr_sub_pred = lgbm.predict(X_sub_train)
+        #Y_tr_sub_pred = lgbm.predict(X_sub_train)
+        Y_tr_pred = lgbm.predict(X_train)
         Y_val_pred    = lgbm.predict(X_val)
         Y_test_pred   = lgbm.predict(X_test)
 
         metrics_train = eval.evaluate(
-            Y_sub_train[target].values, Y_tr_sub_pred,
+            Y_train[target].values, Y_tr_pred,
             BA_path=res_path / f"BA_train_subset_{target}.png",
             R2_path=res_path / f"R2_train_subset_{target}.png",
         )

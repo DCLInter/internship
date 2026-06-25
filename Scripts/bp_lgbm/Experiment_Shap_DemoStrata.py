@@ -71,10 +71,11 @@ if __name__ == "__main__":
     cfg = load_config(grid_path)
     """
     cfg = ExperimentConfig(n_splits=5,
-                           random_state=42, 
+                           random_state=42,
                            experiment_name="Overfitted_Shap_stratified",
                            verbose = -1,
                            model_params=stress_test_params)
+    np.random.seed(cfg.random_state)
     lgbm = build_lgbm(cfg)
 
     # build the pipeline

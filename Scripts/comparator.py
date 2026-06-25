@@ -51,8 +51,8 @@ class Comparator:
         ### change in standart statistics
         means = [np.nanmean(x),np.nanmean(y)]
         median = [np.nanmedian(x),np.nanmedian(y)]
-        quantiles_before = np.nanquantile(x,[0.25,0.27])
-        quantiles_after = np.nanquantile(y,[0.25,0.27])
+        quantiles_before = np.nanquantile(x,[0.25,0.75]) # there was a typo. 0.27 was here instead of 0.75. Fixed on 17/06/2026
+        quantiles_after = np.nanquantile(y,[0.25,0.75])
         percentiles25 = [quantiles_before[0], quantiles_after[0]]
         percentiles75 = [quantiles_before[1], quantiles_after[1]]
         
