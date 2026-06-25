@@ -36,7 +36,7 @@ if __name__ == "__main__":
                  "Ad-Aa_ratio", "Ap2-Ap1_ratio", "AGI", "Kurtosis", "Skewness", 
                  "L-H_ratio", "ShannonEntropy", "Tpp", "PRV", "FullKurt", 
                  "FullSkew", "sdPRV", "IQR_PRV"]
-    df_train = load_PulseDB_sup_ds(train_original_path, feature_names=feature_names)
+    df_train = load_PulseDB_sup_ds(train_clean_path_90, feature_names=feature_names)
     df_test = load_PulseDB_sup_ds(test_original_path, feature_names=feature_names)
     df_test_90 = load_PulseDB_sup_ds(test_clean_path_90, feature_names=feature_names)
     df_test_80 = load_PulseDB_sup_ds(test_clean_path_80, feature_names=feature_names)
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     Y_test_90 = df_test_90[targets]
 
     # Splittin sample wise
-    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"]) # Cant stratify in the cleaned as dataset is quite imbalanced
+    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True,) #stratify=X_train["Subject"]) # Cant stratify in the cleaned as dataset is quite imbalanced
     """
     counts = X_val["Subject"].value_counts()
     print(counts)
@@ -105,14 +105,14 @@ if __name__ == "__main__":
     #-----------------------------------------
     # Just for diagnosing the model
     #-----------------------------------------
-    _, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
+    #_, X_sub_train, _, Y_sub_train = train_test_split(X_train, Y_train, test_size=0.1, random_state= 42, shuffle=True, stratify=X_train["Subject"])
 
     X_train = X_train.drop(columns=["Subject"])
     X_val = X_val.drop(columns=["Subject"])
     X_test = X_test.drop(columns=["Subject"])
     X_test_80 = X_test_80.drop(columns=["Subject"])
     X_test_90 = X_test_90.drop(columns=["Subject"])
-    X_sub_train = X_sub_train.drop(columns=["Subject"])
+    #X_sub_train = X_sub_train.drop(columns=["Subject"])
 
     # build the model
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
@@ -134,21 +134,22 @@ if __name__ == "__main__":
         Y_t = Y_test[target]
         Y_t80 = Y_test_80[target]
         Y_t90 = Y_test_90[target]
-        Y_tr_sub = Y_sub_train[target]
+        #Y_tr_sub = Y_sub_train[target]
 
         # Train
         lgbm.fit(X_train, Y_tr)                               
 
         # Pred
+        Y_pred_tr = lgbm.predict(X_train)
         Y_val_pred = lgbm.predict(X_val)
         Y_pred = lgbm.predict(X_test)
-        Y_tr_sub_pred = lgbm.predict(X_sub_train)
+        #Y_tr_sub_pred = lgbm.predict(X_sub_train)
         Y_t_80_pred = lgbm.predict(X_test_80)
         Y_t_90_pred = lgbm.predict(X_test_90)
 
         # Eval
-        Path_res = PERFORMANCE_RESULTS_PAPER / r"Original_Demographics_Baseline"
-        metrics_train = eval.evaluate(Y_tr_sub, Y_tr_sub_pred, 
+        Path_res = PERFORMANCE_RESULTS_PAPER / r"Clean_90_DS"
+        metrics_train = eval.evaluate(Y_tr, Y_pred_tr, 
                                              BA_path=Path_res / f"BA_train_subset_{target}.png",
                                              R2_path= Path_res / f"R2_train_subset_{target}.png")
         metrics_val = eval.evaluate(Y_v, Y_val_pred, 

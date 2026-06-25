@@ -35,19 +35,20 @@ def run_single_ablation(df_train, df_test, proportion, targets, lgbm, base_path)
     )
 
     # Diagnostic subset
+    """
     _, X_sub_train, _, Y_sub_train = train_test_split(
         X_train, Y_train, test_size=0.1, random_state=42, shuffle=True, stratify=X_train["Subject"]
     )
-
+    """
     # Drop Subject col
-    for df_ in [X_train, X_val, X_test, X_sub_train]:
+    for df_ in [X_train, X_val, X_test,]:# X_sub_train]:
         df_.drop(columns=["Subject"], inplace=True)
 
     # Run for each target
     all_metrics = []
     for target in targets:
         Y_tr, Y_v, Y_t = Y_train[target], Y_val[target], Y_test[target]
-        Y_tr_sub = Y_sub_train[target]
+        #Y_tr_sub = Y_sub_train[target]
 
         # ---- Integrate model + pipeline
         pipeline = Pipeline([
@@ -58,12 +59,13 @@ def run_single_ablation(df_train, df_test, proportion, targets, lgbm, base_path)
 
         Y_val_pred = pipeline.predict(X_val)
         Y_pred = pipeline.predict(X_test)
-        Y_tr_sub_pred = pipeline.predict(X_sub_train)
+        Y_tr_pred = pipeline.predict(X_train)
+        #Y_tr_sub_pred = pipeline.predict(X_sub_train)
 
         Path_res = base_path / f"Sample_Size_{proportion:.2f}"
         Path_res.mkdir(parents=True, exist_ok=True)
 
-        metrics_train = eval.evaluate(Y_tr_sub, Y_tr_sub_pred,
+        metrics_train = eval.evaluate(Y_tr, Y_tr_pred,
                                       BA_path=Path_res / f"BA_train_subset_{target}.png",
                                       R2_path=Path_res / f"R2_train_subset_{target}.png")
         metrics_val = eval.evaluate(Y_v, Y_val_pred,
