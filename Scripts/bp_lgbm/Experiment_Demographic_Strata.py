@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # Initialize model
     #==========================================================
     # build the model
-    """
+    
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
     """
@@ -82,6 +82,7 @@ if __name__ == "__main__":
                            experiment_name="Stress_Test_Demographics",
                            verbose = -1,
                            model_params=stress_test_params)
+    """
     np.random.seed(cfg.random_state)
     lgbm = build_lgbm(cfg)
 

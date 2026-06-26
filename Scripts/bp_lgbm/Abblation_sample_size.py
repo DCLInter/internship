@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     proportions = [0.05, 0.1, 0.25, 0.5, 0.75, 1.0]
     targets = ["SBP","DBP","MAP"]
-    
+    """
     grid_path = GS_RESULT_PAPER / "Full_Grid_Randomized_search_3targets.json"
     cfg = load_config(grid_path)
     """
@@ -110,9 +110,9 @@ if __name__ == "__main__":
                            experiment_name="Overperformance",
                            verbose = -1,
                            model_params=stress_test_params)
-    """
+    
 
-    base_path = ABBLATION_RESULTS_PAPER / "Sample_Size"
+    base_path = ABBLATION_RESULTS_PAPER / "Sample_Size_Stress_Test"
     base_path.mkdir(parents=True, exist_ok=True)
 
     all_results = []
