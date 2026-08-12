@@ -1,0 +1,176 @@
+--- CELL ---
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(Path("../").resolve()))
+
+from fig_style import (
+    DPI, W_FULL, W_SINGLE, ASPECT, FONT_FAMILY,
+    MIN_PX_FULL, MIN_PX_SINGLE,
+    apply_base_style, save_fig,
+)
+from local_paths import ABBLATION_RESULTS_PAPER, FIGURES_PAPER
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
+
+FIG_OUT = FIGURES_PAPER
+FIG_OUT.mkdir(parents=True, exist_ok=True)
+print(f"Output directory : {FIG_OUT.resolve()}")
+print(f"Full-page  : {W_FULL:.2f} × {W_FULL*ASPECT:.2f} in  →  "
+      f"{round(W_FULL*DPI)} × {round(W_FULL*ASPECT*DPI)} px @ {DPI} dpi")
+print(f"Single-col : {W_SINGLE:.2f} × {W_SINGLE*ASPECT:.2f} in  →  "
+      f"{round(W_SINGLE*DPI)} × {round(W_SINGLE*ASPECT*DPI)} px @ {DPI} dpi")
+
+--- CELL ---
+# ── Change TARGET here to produce DBP or MAP figures ─────────────────────────
+TARGET      = "MAP"
+
+PROPORTIONS = [0.05, 0.10, 0.25, 0.50, 0.75, 1.00]
+X_LABELS    = ["5%", "10%", "25%", "50%", "75%", "100%"]
+
+base   = ABBLATION_RESULTS_PAPER
+df_gen = pd.read_csv(base / "Sample_Size"             / "Aggregated_Results.csv")
+df_fb  = pd.read_csv(base / "Sample_Size_Stress_Test" / "Aggregated_Results.csv")
+
+print("Generalisable subsets :", sorted(df_gen["subset"].unique()))
+print("Fit-Biased    subsets :", sorted(df_fb["subset"].unique()))
+print("Proportions           :", sorted(df_gen["proportion"].unique()))
+
+--- CELL ---
+# ── Palette (consistent with Fig 6) ──────────────────────────────────────────
+COLOR_GEN   = "#E84855"   # Watermelon → Generalisable
+COLOR_FB    = "#27AE60"   # Green      → Fit-Biased
+COLOR_LABEL = "#333333"   # dark gray for all data labels
+LW          = 1.8
+MS          = 5
+
+
+def get_r2(df, target, subset, x_vals):
+    """Return R² (%) list aligned to x_vals; NaN if a proportion is missing."""
+    sub = df[(df["target"] == target) & (df["subset"] == subset)].set_index("proportion")
+    return [sub.loc[x, "R2"] * 100 if x in sub.index else np.nan for x in x_vals]
+
+
+def _add_labels(ax, xi, vals, va, y_off, x_off, fs):
+    for i, v in enumerate(vals):
+        if not np.isnan(v):
+            ax.text(
+                xi[i] + x_off, v + y_off,
+                f"{v:.2f}%",
+                ha="center", va=va,
+                fontsize=fs, fontfamily=FONT_FAMILY,
+                color=COLOR_LABEL,
+            )
+
+
+def make_sample_size_fig(width_in: float, target: str = TARGET):
+    height_in = width_in * ASPECT
+    is_small  = width_in < 5
+    label_fs  = 5.5 if is_small else 7.0
+    tick_fs   = 6   if is_small else 8
+    title_fs  = 7   if is_small else 10
+    leg_fs    = 6   if is_small else 8
+    lw        = 1.2 if is_small else LW
+    ms        = 3.5 if is_small else MS
+
+    xi = np.arange(len(PROPORTIONS))
+
+    fig, ax = plt.subplots(
+        figsize=(width_in, height_in),
+        dpi=DPI,
+        layout="constrained",
+    )
+
+    gen_tr = get_r2(df_gen, target, "Train", PROPORTIONS)
+    gen_te = get_r2(df_gen, target, "Test",  PROPORTIONS)
+    fb_tr  = get_r2(df_fb,  target, "Train", PROPORTIONS)
+    fb_te  = get_r2(df_fb,  target, "Test",  PROPORTIONS)
+
+    # Lines: filled markers = Training, hollow markers = Testing
+    ax.plot(xi, gen_tr, color=COLOR_GEN, ls="-",  marker="o", lw=lw, ms=ms, zorder=3)
+    ax.plot(xi, gen_te, color=COLOR_GEN, ls="--", marker="o", lw=lw, ms=ms, zorder=3,
+            markerfacecolor="white", markeredgewidth=1.2)
+    ax.plot(xi, fb_tr,  color=COLOR_FB,  ls="-",  marker="s", lw=lw, ms=ms, zorder=3)
+    ax.plot(xi, fb_te,  color=COLOR_FB,  ls="--", marker="s", lw=lw, ms=ms, zorder=3,
+            markerfacecolor="white", markeredgewidth=1.2)
+
+    # Data labels: gen_tr, gen_te, fb_tr all above; fb_te above except last two
+    _add_labels(ax, xi,      gen_tr,       "bottom", +2.5, -0.06, label_fs)
+    _add_labels(ax, xi,      gen_te,       "bottom", +2.5, -0.06, label_fs)
+    _add_labels(ax, xi,      fb_tr,        "bottom", +2.5, +0.06, label_fs)
+    _add_labels(ax, xi[:-2], fb_te[:-2],   "bottom", +2.5, +0.06, label_fs)
+    _add_labels(ax, xi[-2:], fb_te[-2:],   "top",    -2.5, +0.06, label_fs)
+
+    # Axes
+    ax.set_xticks(xi)
+    ax.set_xticklabels(X_LABELS, fontsize=tick_fs, fontfamily=FONT_FAMILY)
+    ax.set_xlim(-0.6, len(PROPORTIONS) - 0.4)
+    ax.set_ylim(-22, 115)
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(20))
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=100, decimals=0))
+    ax.set_xlabel(
+        "Sample Size (% of training data)",
+        fontsize=tick_fs + 1, fontfamily=FONT_FAMILY,
+    )
+    ax.set_ylabel("R²", fontsize=tick_fs + 1, fontfamily=FONT_FAMILY)
+
+    apply_base_style(ax, grid_axis="y")
+    ax.tick_params(axis="both", labelsize=tick_fs)
+
+    # Legend: filled marker = Training, hollow marker = Testing
+    legend_elements = [
+        Line2D([0],[0], color=COLOR_GEN, ls="-",  marker="o", lw=LW, ms=MS,
+               label="Training — Generalisable"),
+        Line2D([0],[0], color=COLOR_GEN, ls="--", marker="o", lw=LW, ms=MS,
+               markerfacecolor="white", markeredgewidth=1.2,
+               label="Testing — Generalisable"),
+        Line2D([0],[0], color=COLOR_FB,  ls="-",  marker="s", lw=LW, ms=MS,
+               label="Training — Fit-Biased"),
+        Line2D([0],[0], color=COLOR_FB,  ls="--", marker="s", lw=LW, ms=MS,
+               markerfacecolor="white", markeredgewidth=1.2,
+               label="Testing — Fit-Biased"),
+    ]
+    ax.legend(
+        handles=legend_elements,
+        loc="upper right", ncol=1,
+        fontsize=leg_fs,
+        handlelength=2.5,
+        frameon=True, framealpha=0.9, edgecolor="#CCCCCC",
+    )
+
+    ax.set_title(
+        f"R² Performance Across Different Sample Sizes ({target})\n"
+        "Generalisable vs Fit-Biased Model Configurations",
+        fontsize=title_fs + 1,
+        fontfamily=FONT_FAMILY,
+    )
+    return fig
+
+
+fig_full   = make_sample_size_fig(W_FULL)
+fig_single = make_sample_size_fig(W_SINGLE)
+
+save_fig(fig_full,   f"Fig_Ablation_SampleSize_{TARGET}_full",   FIG_OUT)
+save_fig(fig_single, f"Fig_Ablation_SampleSize_{TARGET}_single", FIG_OUT)
+
+print(f"Full-page  : {round(W_FULL*DPI)} × {round(W_FULL*ASPECT*DPI)} px")
+print(f"Single-col : {round(W_SINGLE*DPI)} × {round(W_SINGLE*ASPECT*DPI)} px")
+plt.show()
+
+--- CELL ---
+from PIL import Image
+
+for fname, req_w in [
+    (f"Fig_Ablation_SampleSize_{TARGET}_full.png",   MIN_PX_FULL),
+    (f"Fig_Ablation_SampleSize_{TARGET}_single.png", MIN_PX_SINGLE),
+]:
+    with Image.open(FIG_OUT / fname) as im:
+        w, h = im.size
+    ok = "\u2705" if w >= req_w else "\u274c"
+    print(f"{ok} {fname}: {w} \u00d7 {h} px  (min required: {req_w} px wide)")
+

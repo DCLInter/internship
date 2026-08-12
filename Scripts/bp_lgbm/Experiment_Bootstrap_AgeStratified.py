@@ -1,8 +1,8 @@
 ############ BOOTSTRAP CI — AGE-STRATIFIED ############################
 #                                                                      #
-# Trains a PPG-only LightGBM on the full original training set, then  #
-# runs bootstrap CI evaluation separately on each age stratum of the   #
-# test set:                                                            #
+# Trains a separate PPG-only LightGBM per age stratum — each model is  #
+# fit only on the age-filtered training subset — then runs bootstrap  #
+# CI evaluation on the matching age stratum of the test set:           #
 #   age_lt60  : Age < 60   (mirrors demo_strata_utils label "Age<60") #
 #   age_gte60 : Age >= 60  (mirrors demo_strata_utils label "Age>=60") #
 #                                                                      #
