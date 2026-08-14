@@ -358,7 +358,7 @@ def save_bootstrap_ci(
         ci_df.insert(1, "point_estimate", ci_df["metric"].map(point_metrics))
 
     ci_df.to_csv(path, index=False)
-    print(f"✅ Saved: {path}")
+    print(f"Saved: {path}")
 
 
 def save_results_dict(res_dict: dict, save_path: str, subset_col: str = "subset"):
@@ -380,5 +380,5 @@ def save_results_dict(res_dict: dict, save_path: str, subset_col: str = "subset"
     # Save to CSV
     df.to_csv(save_path, index=False)
 
-    print(f"✅ Results saved to {save_path}")
+    print(f"Results saved to {save_path}")
     return df

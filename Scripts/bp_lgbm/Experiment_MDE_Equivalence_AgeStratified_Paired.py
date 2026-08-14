@@ -1,21 +1,21 @@
-############ MDE + EQUIVALENCE — AGE >=60 vs FULL, PAIRED, MATCHED-N #########
+############ MDE + EQUIVALENCE — AGE >=60 vs FULL, PAIRED (SAME TEST SET) ####
 #                                                                             #
 # Post-processing only: no model training, no re-inference. Computes the     #
 # minimum detectable effect (MDE) and an equivalence test for the Age>=60    #
-# vs Full contrast produced by                                               #
-# Experiment_Bootstrap_AgeStratified_PairedDownsample.py.                    #
+# vs Full contrast produced by Experiment_Bootstrap_AgeStratified_Paired.py. #
 #                                                                             #
 # Unlike Experiment_MDE_Equivalence_AgeStratified.py (the original, which    #
 # bootstraps two independent, unequal-sized pools and has to fall back to a  #
-# Wald/quadrature CI), this contrast IS paired: both arms share one array of #
-# bootstrap resample positions, so row i of both Distribution_{target}.csv   #
-# files comes from the same underlying random draw. Reconstructs the paired  #
-# diff by loading both files and subtracting row-wise — same pattern as      #
+# Wald/quadrature CI), this contrast IS paired: both arms are evaluated on   #
+# the literal same Age>=60 test subjects, driven by one shared bootstrap     #
+# resample list, so row i of both Distribution_{target}.csv files comes      #
+# from the same resampled subjects. Reconstructs the paired diff by loading  #
+# both files and subtracting row-wise — same pattern as                     #
 # Experiment_MDE_Equivalence_Filtering.py.                                   #
 #                                                                             #
 # Saves:                                                                     #
-#   Bootstrap_AgeStratified_PairedDownsample/                                #
-#     MDE_Equivalence_AgeStratified_PairedDownsample.csv                     #
+#   Bootstrap_AgeStratified_Paired/                                          #
+#     MDE_Equivalence_AgeStratified_Paired.csv                               #
 ###############################################################################
 
 import numpy as np
@@ -24,7 +24,7 @@ import pandas as pd
 from local_paths import PERFORMANCE_RESULTS_PAPER
 
 TARGETS  = ["SBP", "DBP", "MAP"]
-CONTRAST = "age_gte60_vs_full_downsampled_paired"
+CONTRAST = "age_gte60_vs_full_model_paired_same_test"
 
 Z_MDE       = 2.8    # (1.96 + 0.84), two-sided alpha=0.05, 80% power
 EQUIV_DELTA = 2.0    # equivalence margin, pp of R2, declared a priori
@@ -39,8 +39,8 @@ def load_point_r2(res_dir, target):
 
 if __name__ == "__main__":
 
-    res_root  = PERFORMANCE_RESULTS_PAPER / "Bootstrap_AgeStratified_PairedDownsample"
-    dir_full  = res_root / "full_downsampled"
+    res_root  = PERFORMANCE_RESULTS_PAPER / "Bootstrap_AgeStratified_Paired"
+    dir_full  = res_root / "full_model"
     dir_gte60 = res_root / "age_gte60"
 
     rows = []
@@ -50,13 +50,14 @@ if __name__ == "__main__":
 
         if len(dist_full) != len(dist_gte60):
             raise RuntimeError(
-                f"{target}: row-count mismatch between full_downsampled "
+                f"{target}: row-count mismatch between full_model "
                 f"({len(dist_full)}) and age_gte60 ({len(dist_gte60)}) "
                 f"distributions — files are not paired by resample index."
             )
 
-        # Paired difference: shared resample-position array upstream means
-        # row i of both distributions comes from the same underlying draw.
+        # Paired difference: both arms evaluated on the same shared bootstrap
+        # resamples of the same test subjects, so row i of both distributions
+        # comes from the same underlying draw.
         diff_pp = (dist_gte60["R2"] - dist_full["R2"]).to_numpy() * 100.0
 
         observed_diff_pp = (
@@ -121,10 +122,10 @@ if __name__ == "__main__":
     # =========================================================
     # Save + print
     # =========================================================
-    out_path = res_root / "MDE_Equivalence_AgeStratified_PairedDownsample.csv"
+    out_path = res_root / "MDE_Equivalence_AgeStratified_Paired.csv"
     result_df.to_csv(out_path, index=False)
     print(f"Saved: {out_path}")
 
-    print("\n=== MDE / Equivalence - age>=60 vs full (downsampled, paired) (pp of R2) ===")
+    print("\n=== MDE / Equivalence - age>=60 vs full model, same test set (pp of R2) ===")
     with pd.option_context("display.float_format", lambda x: f"{x:.2f}"):
         print(result_df.to_string(index=False))
