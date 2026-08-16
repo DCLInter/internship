@@ -8,6 +8,8 @@ mi_results
 shap_results
 Bland_Altman_results
 .venv310
+Scripts/fiducial_quality_filtering/outputs/
+Scripts/fiducial_quality_filtering/*.log
 
 
 # Ignore Python cache

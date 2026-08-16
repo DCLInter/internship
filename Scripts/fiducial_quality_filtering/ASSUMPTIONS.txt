@@ -1,0 +1,106 @@
+ASSUMPTIONS MADE DURING THE REFACTOR
+=====================================
+(2026-08-16, while working without the project owner present)
+
+BUG FOUND AND FIXED DURING VALIDATION (not an assumption, but flagging it
+prominently since it changed actual output values):
+
+checker.py's score_and_report() originally computed the criterion-4 combined
+score with pandas .mean(axis=0), which divides by the count of NON-NaN
+windows. The original metrics_functions.py/checker.py instead does
+`sc.sum()/n` where n is the TOTAL window count (sc.shape[0]) - i.e. NaN
+windows are treated as contributing 0 to the sum but still count in the
+denominator, which is a systematically lower (stricter) score for any
+signal with missing/NaN fiducial windows than a plain mean would give.
+This was caught by validate_against_clean_subset.py: on the first 1500
+signals of VitalDB_Train_Subset, 6 signals were kept by the refactor that
+the original pipeline had discarded, all due to this. Fixed in checker.py's
+score_and_report() to replicate sum(skipna=True)/n_windows exactly (see the
+comment there). Re-verified 0 mismatches over the same 1500-signal slice
+after the fix.
+
+1. SCOPE: "fiducial quality pipeline" = the checking/scoring/discarding
+   stage only (old checker.py + cleaning.py + metrics_functions.py +
+   new_checker.py). It does NOT include pyPPG fiducial extraction itself
+   (Scripts/new_extraction_fiducials.py), which is a separate upstream
+   step this folder treats as already done. Confirmed pyPPG is not even
+   installed on this machine, which is consistent with this stage not
+   needing it.
+
+2. DATA FORMAT TARGETED: the flat PulseDB-supplement format (one big
+   dataset per subset, not per-patient groups), matching how
+   Scripts/new_checker.py was actually being used (hardcoded filenames
+   like Fiducial_Points_VitalDB_CalFree_Test_Subset.h5). The patient-
+   grouped H5 format (p000001, p000002, ... each with its own
+   "segments"/"Features" datasets) that Scripts/main.py's version of the
+   pipeline targets was NOT covered - main.py was already flagged as a
+   broken/stale prototype (mismatched Checker constructor, bad import) in
+   an earlier conversation, so it wasn't used as a reference.
+
+3. FIDUCIAL ATTRS: the original new_checker.py read fiducial-point column
+   names from an HDF5 attribute (`group[dst].attrs.items()`), but the
+   Fiducial_Points_VitalDB_Train_Subset.h5 file actually available on this
+   machine has NO such attribute (verified empty). The refactor uses the
+   hardcoded FIDUCIAL_ORDER list (16 names, matches Checker.fiducial_order
+   in the original code) instead of reading it from the file. If a
+   subset's fiducial file ever uses a different point ordering, this
+   would silently mislabel columns - worth a sanity check if new data
+   sources are added.
+
+4. DROPPED THE UNUSED HDF5-READING BRANCH IN Cleaner.clean(): the original
+   cleaning.py supported two ways of calling .clean() - passing an
+   in-memory `data_ext` dict, or passing a path to read + clean directly
+   from HDF5. Only the data_ext path was ever used by new_checker.py, and
+   the HDF5-reading path had a real bug (self.demo_info / self.attributes
+   were left empty when data_ext was used instead, so csvReport() would
+   KeyError on demographic columns if called after a data_ext clean()).
+   The refactor keeps only the data_ext path and removes the demographic
+   columns from csv_report() entirely (see point 5) rather than fixing a
+   code path nothing currently calls.
+
+5. csv_report() no longer includes age/gender/weight/height/BMI columns
+   that the original Cleaner.csvReport() had. Those required demographic
+   attributes that were only populated by the removed HDF5-reading branch
+   (see point 4). Demographics-vs-removal reporting is still produced, but
+   via Demographic_Info_<subset>.xlsx in run_pipeline.py (which reads
+   demographics straight from the Features_<subset>.h5 file), not via
+   cleaner.csv_report(). If you need both in one file, they can be merged.
+
+6. VALIDATION SUBSET: validate_against_clean_subset.py defaults to the
+   Train subset because, at the time of writing, the CalFree_Test subset
+   was MISSING its Fiducial_Points_VitalDB_CalFree_Test_Subset.h5 file in
+   the SupplementarySubsets folder (Features file was present, fiducials
+   file was not) - this was already flagged earlier in this conversation.
+   If that file turns up, the same script works for CalFree_Test by
+   changing SUBSET_NAME at the top.
+
+7. VALIDATION METHOD: compares the refactored pipeline's output against
+   the pre-existing Clean_Features_VitalDB_Train_Subset_90.h5 by exact
+   array match (PPG_Features values, Subject order, SBP/MAP/Age), not by
+   re-deriving expected removal counts from first principles. A pass means
+   "this refactor reproduces the old pipeline's output exactly for this
+   file", not "the quality criteria themselves are correct" - that
+   judgment call (what thresholds/weights to use) is the project owner's,
+   and is exactly what the alpha/beta/threshold sweep this refactor is
+   meant to support will help explore.
+
+8. ENVIRONMENT: .venv310/ did not exist in the repo on this machine at the
+   start of this session. It was created fresh from the raw Python 3.10
+   interpreter found at
+   C:\Users\Felipe Saldarriaga\AppData\Local\Programs\Python\Python310\python.exe
+   and Scripts/bp_lgbm/Requirements.txt was pip-installed into it in full
+   (including NPEET from GitHub), per your instruction to rebuild it. This
+   venv is untracked/gitignored as documented in CLAUDE.md - freeze/commit
+   requirements as you see fit; nothing here assumes a specific frozen
+   version beyond what Requirements.txt already pins (nothing is pinned -
+   Requirements.txt has no version numbers, so exact package versions
+   installed are whatever pip resolved as latest-compatible on 2026-08-16).
+
+9. OUTPUT LOCATION: run_pipeline.py writes everything to
+   fiducial_quality_filtering/outputs/ by default (created if missing),
+   rather than back into the SupplementarySubsets OneDrive folder the
+   original script wrote into. This keeps generated artifacts out of the
+   OneDrive-synced data folder and out of git (outputs/ should be added to
+   .gitignore if not already covered by the existing CV_results*/mi_
+   results/etc. patterns - it currently is NOT explicitly ignored, please
+   check before committing anything from there).
