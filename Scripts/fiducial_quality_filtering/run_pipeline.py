@@ -61,8 +61,8 @@ SUBSETS = {
 # Checks not affected by alpha/beta or the discard thresholds.
 CHECK_THRESHOLDS = {
     "sp_limit": 2,
-    "bmin": 50,
-    "bmax": 180,
+    "bmin": 40,
+    "bmax": 200,
 }
 
 # Criterion 4 weights (alpha = w_consistency, beta = w_alignment) and the

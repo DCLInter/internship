@@ -104,3 +104,68 @@ after the fix.
    .gitignore if not already covered by the existing CV_results*/mi_
    results/etc. patterns - it currently is NOT explicitly ignored, please
    check before committing anything from there).
+
+
+ASSUMPTIONS FOR THE ALPHA/BETA + THRESHOLD SWEEP
+(2026-08-17, build_cache.py / sweep_alpha_beta.py / sweep_thresholds.py)
+==========================================================================
+
+10. RAW METRICS CACHE FORMAT/PRECISION: raw_metrics_cache.py stores
+    alignment/consistency as float32 (not float64) to keep the cache size
+    manageable (~1.1GB for the Train subset's 465,480 signals - two
+    (n_signals, max_windows, 16) arrays). This introduces score
+    differences up to ~1e-5 vs the float64 per-signal path in checker.py -
+    verified negligible (never changes a report/keep decision) by
+    validating against checker.py's QualityChecker on 5,000 signals across
+    3 different alpha/beta/threshold combinations before trusting it for
+    the real sweep.
+
+11. WINDOW COUNT DIFFERS BY SUBSET: Train's fiducial file has 336 rows
+    (21 windows/signal before dropna); the newly-uploaded CalFree_Test
+    file has 320 rows (20 windows/signal) - a different fixed shape per
+    subset, not a bug. raw_metrics_cache.py derives max_windows from each
+    file's own shape rather than hardcoding it, so this is handled
+    automatically, but it does mean the two subsets' cache files are not
+    interchangeable/comparable at the array-shape level (this doesn't
+    matter for anything the sweep scripts do, since scoring is always
+    per-subset).
+
+12. SUBJECT-DROP DEFINITION: reported BOTH interpretations side by side in
+    the sweep summary CSVs, per your answer - "subjects with >=1 dropped
+    sample" (n_subjects_any_dropped) and "subjects entirely dropped, 100%
+    of their samples gone" (n_subjects_fully_dropped). Note the first one
+    is 100% for essentially the whole alpha/beta/threshold grid tested
+    (every subject has at least one bad signal somewhere) - it's the
+    "fully dropped" number that actually moves and is probably the more
+    decision-relevant one, but both are in the CSVs.
+
+13. GRID CHOICES (edit at the top of each sweep script to change):
+    - alpha (w_consistency): 0.0 to 1.0 in steps of 0.1 (11 points), with
+      beta = 1 - alpha, thresholds fixed at 90/90 (the pipeline default).
+    - thres_fiducials = thres_score together: 70 to 95 in steps of 5 (6
+      points), alpha/beta fixed at 0.25/0.75 (the pipeline default). Note
+      the observed jump in the Train subset between thres=85 (15.2%
+      dropped) and thres=90 (59.5% dropped) is large and worth a closer
+      look with a finer grid (e.g. step of 1) around 85-90 if you want to
+      pick a threshold precisely rather than just from {70,75,...,95}.
+    Neither script sweeps a genuine 2D grid (alpha x beta x threshold
+    together) - see README.txt's "WRITING YOUR OWN SWEEP" section for how
+    to build one on top of the same cache without recomputing anything.
+
+14. LOCAL SAMPLE INDEX, NOT GLOBAL: the dropped-signals JSON indexes each
+    dropped sample by its position WITHIN its own subject's block of
+    signals in Features_<subset>.h5 (0, 1, 2, ... per subject), not by a
+    global 0..465479 index. This was chosen because it's what you'd
+    actually filter by if loading data grouped/indexed by subject at
+    training time; if you need the global index instead it's trivial to
+    derive (cumulative subject signal counts + local index), just flag it
+    if that's what you actually want.
+
+15. OUTPUT LOCATION FOR THE SWEEP RESULTS: written to the
+    Filtering_Sensitivity folder you created, one subfolder per subset
+    (matching the subset names used throughout: VitalDB_Train_Subset,
+    VitalDB_CalFree_Test_Subset), NOT into
+    fiducial_quality_filtering/outputs/ - these are meant to be reused
+    from outside this repo (at training time), so they went to the shared
+    OneDrive location you specified rather than the gitignored local
+    outputs/ folder.

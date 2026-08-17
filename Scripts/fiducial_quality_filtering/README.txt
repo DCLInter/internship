@@ -64,6 +64,40 @@ ASSUMPTIONS.txt
     Everything that had to be inferred or decided without checking with
     the project owner. Read this before trusting the numbers.
 
+raw_metrics_cache.py
+    Cacheable, vectorized version of the expensive per-signal loop. Same
+    numbers as checker.py (reuses metrics.py directly, no duplicated
+    logic), but stored as plain numpy arrays instead of per-signal pandas
+    DataFrames, so they can be (a) saved to a single .npz file and (b)
+    scored for ANY alpha/beta/thresholds with a few vectorized numpy ops
+    over ALL signals at once - no per-signal Python loop. Validated against
+    checker.py's per-signal path (exact report match, score match to
+    float32 precision) before being used for the sweeps below.
+
+build_cache.py
+    Runs raw_metrics_cache.compute_raw_metrics_cache() once per subset and
+    saves RawMetricsCache_<subset>.npz into the PulseDB SupplementarySubsets
+    folder (next to the source data, NOT in outputs/ - it's an input to the
+    sweep scripts, not a result). Only needs re-running if the underlying
+    fiducial data changes. Takes ~60-90 min for the Train subset (465k
+    signals, ~2GB RAM); the Test subset is ~8x smaller and much faster.
+
+sweep_common.py
+    Shared helpers for the two sweep scripts below: turning a per-signal
+    discard mask into the summary stats and the reusable dropped-signal
+    JSON (see OUTPUTS below).
+
+sweep_alpha_beta.py
+    First-pass sensitivity sweep over alpha (w_consistency), with
+    beta = 1 - alpha (a 1D sweep, NOT a full alpha x beta grid).
+    Thresholds held fixed at 90/90. Loads the cache from build_cache.py -
+    does NOT recompute raw metrics.
+
+sweep_thresholds.py
+    Same idea, sweeping thres_fiducials = thres_score together (a 1D
+    sweep - NOT thres_fiducials and thres_score varied independently).
+    alpha/beta held fixed at 0.25/0.75.
+
 
 INPUTS (per subset, from PulseDB SupplementarySubsets folder)
 ---------------------------------------------------------------
@@ -111,6 +145,39 @@ Demographic_Info_<subset>.xlsx
     drop, since it's reporting on the drop itself).
 
 
+SWEEP OUTPUTS (written to the Filtering_Sensitivity folder, one subfolder
+per subset - see ASSUMPTIONS.txt for the exact path)
+---------------------------------------------------------------------------
+
+<subset>/alpha_beta_sweep_summary.csv
+<subset>/threshold_sweep_summary.csv
+    One row per grid point (alpha value, or threshold value): the swept
+    parameter(s), samples dropped (raw count + % of the full subset),
+    subjects with >=1 dropped sample (raw count + %), and subjects
+    ENTIRELY dropped - 100% of their samples gone (raw count + %). Both
+    subject-drop definitions are reported side by side, since they can
+    diverge a lot (see ASSUMPTIONS.txt).
+
+<subset>/dropped_signals/alpha_beta/alpha_<value>.json
+<subset>/dropped_signals/threshold/thres_<value>.json
+    One JSON file per grid point: which exact signals were dropped at that
+    parameter value. Schema:
+        {
+          "subset": "...",
+          "parameters": {"w_consistency": 0.3, "w_alignment": 0.7,
+                          "thres_fiducials": 90, "thres_score": 90},
+          "n_total_signals": 465480,
+          "n_dropped": 276707,
+          "dropped": {"p000001_1": [3, 7, 12, ...], "p000003_1": [0, 1, ...]}
+        }
+    "dropped" maps subject id -> list of dropped LOCAL sample indices (the
+    signal's position within that subject's own block of signals, in
+    Features_<subset>.h5 file order - not a global index). This is exactly
+    what you need to build a per-subject keep/drop boolean mask when
+    loading the full dataframe for training, without re-running any of
+    this pipeline.
+
+
 HOW TO RUN
 ----------
 
@@ -124,22 +191,36 @@ Edit the CONFIGURATION block at the top of run_pipeline.py first if your
 data lives somewhere other than the OneDrive SupplementarySubsets path
 hardcoded there, or if you want different alpha/beta/thresholds.
 
+For a sweep, run once (expensive, ~60-90 min for Train):
 
-SWEEPING ALPHA/BETA OR THE THRESHOLDS
---------------------------------------
+    ..\..\.venv310\Scripts\python.exe build_cache.py
 
-Don't call run_pipeline.run_subset() in a loop - it reloads the data and
-reruns the expensive per-signal metrics every time. Instead:
+then as many times as you like (cheap, seconds, since it only loads the
+cache and does vectorized numpy - no per-signal loop):
 
-    checker = QualityChecker(...)
-    checker.compute_raw_metrics("Full_set")          # run ONCE
-    for w_consistency, w_alignment in weight_grid:
-        for thres_fid, thres_score in threshold_grid:
-            df = checker.score_and_report(
-                "Full_set", w_consistency, w_alignment, thres_fid, thres_score
-            )
-            # df["report"] now reflects this parameter combination -
-            # inspect / aggregate as needed.
+    ..\..\.venv310\Scripts\python.exe sweep_alpha_beta.py
+    ..\..\.venv310\Scripts\python.exe sweep_thresholds.py
 
-See checker.py's module docstring for why this split is safe (alignment
-and consistency don't depend on the weights or thresholds at all).
+Edit ALPHA_GRID / THRESHOLD_GRID / FIXED_THRESHOLDS / FIXED_WEIGHTS at the
+top of those two scripts to change the grid or the held-fixed parameter.
+
+
+WRITING YOUR OWN SWEEP (a genuine alpha x beta x threshold grid, a
+different subject-drop rule, etc.)
+---------------------------------------------------------------------
+
+Load the cache once, then score as many times as you like - each call is
+vectorized numpy over every signal at once, no Python loop:
+
+    from raw_metrics_cache import load_cache, vectorized_report
+    cache = load_cache("RawMetricsCache_<subset>.npz")   # from build_cache.py
+    discard_mask = vectorized_report(cache, w_consistency, w_alignment,
+                                      thres_fiducials, thres_score)
+    # discard_mask: bool array, one per signal, True = drop.
+    # Feed it to sweep_common.summarize_drop()/dropped_signals_payload()
+    # for the same stats/JSON shape the two sweep scripts produce.
+
+If you don't have a cache yet and only need ONE parameter combination
+(not a sweep), checker.QualityChecker still works standalone - see
+checker.py's module docstring. It's the same math, just per-signal pandas
+instead of vectorized numpy, and not cacheable.
