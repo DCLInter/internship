@@ -38,6 +38,7 @@ OUTPUT_ROOT = Path(
 )
 
 ALPHA_GRID = np.round(np.arange(0.0, 1.0001, 0.1), 2)  # beta = 1 - alpha
+ALPHA_GRID = np.unique(np.concatenate([ALPHA_GRID, [0.25, 0.75]]))  # + the pipeline's own 25/75 and 75/25 split
 FIXED_THRESHOLDS = {"thres_fiducials": 90, "thres_score": 90}
 
 
@@ -61,7 +62,7 @@ def run_subset(subset_name: str, features_path: Path, output_dir: Path):
         stats = summarize_drop(discard, subjects)
         stats_row = {"w_consistency_alpha": alpha, "w_alignment_beta": beta, **FIXED_THRESHOLDS, **stats}
         rows.append(stats_row)
-        print(f"  alpha={alpha:.1f} beta={beta:.1f}: "
+        print(f"  alpha={alpha:.2f} beta={beta:.2f}: "
               f"{stats['n_dropped_signals']}/{stats['n_total_signals']} signals dropped "
               f"({stats['pct_dropped_signals']:.2f}%), "
               f"{stats['n_subjects_any_dropped']}/{stats['n_subjects_total']} subjects touched "
@@ -74,7 +75,7 @@ def run_subset(subset_name: str, features_path: Path, output_dir: Path):
             {"w_consistency": alpha, "w_alignment": beta, **FIXED_THRESHOLDS},
             discard, subjects,
         )
-        save_json(payload, json_dir / f"alpha_{alpha:.1f}.json")
+        save_json(payload, json_dir / f"alpha_{alpha:.2f}.json")
 
     summary = pd.DataFrame(rows)
     output_dir.mkdir(parents=True, exist_ok=True)
