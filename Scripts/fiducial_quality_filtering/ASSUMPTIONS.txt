@@ -169,3 +169,71 @@ ASSUMPTIONS FOR THE ALPHA/BETA + THRESHOLD SWEEP
     from outside this repo (at training time), so they went to the shared
     OneDrive location you specified rather than the gitignored local
     outputs/ folder.
+
+
+CLEAN_FEATURES REBUILD + DISTRIBUTION SHIFT UNIFICATION
+(2026-08-18, rebuild_clean_features.py / distribution_shift.py)
+==========================================================================
+
+16. bmin/bmax CORRECTION, DIRECTION CLARIFIED: earlier in this project
+    bmin=40/bmax=200 was flagged as a possibly-accidental change from
+    bmin=50/bmax=180. The project owner has since clarified the opposite:
+    40/200 is CORRECT and current; the Clean_Features_*_{80,90}.h5 files
+    that existed on disk before this session were built with the WRONG
+    50/180 range and needed replacing. rebuild_clean_features.py
+    reconstructed all 4 files (both subsets x both thresholds) directly
+    from the existing (already-correct, already built from the 40/200
+    cache) sweep_thresholds.py JSONs - no cache rebuild or re-sweep was
+    needed, since those were already right. Verified: (a) reconstructed
+    keep-counts match threshold_sweep_summary.csv exactly for all 4
+    files, (b) a live QualityChecker re-run on the first 2,000 Train
+    signals matches the JSON-reconstructed keep/drop decisions bit-for-
+    bit.
+
+17. DISTRIBUTION-SHIFT SCOPE, PER PROJECT OWNER: unified
+    distribution_shift.py keeps ONLY the pooled (whole-column, all-
+    samples) granularity from the old comparator.py. The per-patient and
+    per-patient-median granularities, and the IQR/MAD outlier detection +
+    Jaccard overlap analysis, were NOT ported (the KS test itself IS
+    kept - statistic D + p-value - just at pooled granularity only). If
+    you want the dropped pieces back, comparator.py's logic is the
+    reference (see its byPatient/byFeature_medians/byFeature_all
+    methods) - nothing was deleted from comparator.py itself.
+
+18. DEMOGRAPHIC/LABEL COLUMNS NOW GET REAL SHIFT METRICS: Age, BMI,
+    Height, Weight, SBP, DBP, MAP are analyzed with the exact same
+    normalized-Wasserstein + KS treatment as the 28 PPG features - this
+    closes the gap where Dataset_exploration.py only had describe()-based
+    summaries for these. Gender (categorical) and SF (constant) are
+    loaded but deliberately excluded from shift stats.
+
+19. IMPUTATION BEFORE SHIFT: both the original and the clean dataframe are
+    patient-wise median-imputed (bp_lgbm.preprocessing.median_impute_
+    patientwise) before computing Wasserstein/KS, fixing the old script's
+    asymmetry (it only imputed the original side). Emits a harmless
+    pandas FutureWarning (DataFrameGroupBy.apply on grouping columns) from
+    the pre-existing preprocessing.py - not something introduced here, not
+    fixed as part of this task.
+
+20. CROSS-PACKAGE IMPORT: distribution_shift.py imports from
+    Scripts/bp_lgbm/ via a sys.path insert at the top of the file. This
+    is explicitly a temporary shortcut - the project owner's plan is to
+    fix cross-package imports and relative paths across the whole repo in
+    one pass before publication, not per-script now.
+
+21. OLD SCRIPTS LEFT IN PLACE: comparator.py, comparator_example.py,
+    new_comparator.py, and Dataset_exploration.py are untouched -
+    superseded but not deleted/fixed (Dataset_exploration.py's
+    ImportError on the missing DATASET_EXPLORATION_RESULTS in
+    local_paths.py was NOT fixed, since that script is no longer the
+    path forward).
+
+22. PRE-FIX OUTPUTS ARCHIVED: every file that was already sitting in the
+    OneDrive Distribution_Analysis folder (built under the wrong 50-180
+    HR range) was moved into a legacy_50-180_bpm/ subfolder there, not
+    deleted, per the project owner's instruction - 12 files
+    (Agreggated_Results_Distrib_Change_{80,90}.xlsx, Demographic_Info_
+    VitalDB_Train_Subset_{80,90}.xlsx, outliers_change_{80,90}.xlsx,
+    overlap_JaccardSimilarity_{80,90}.xlsx +
+    overlap_JaccardSimilarity_Full_Set_Features_90.xlsx, stats_change_
+    {80,90}.xlsx + stats_change_90_Full_Set_Features.xlsx).

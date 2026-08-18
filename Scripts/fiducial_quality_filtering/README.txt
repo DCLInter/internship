@@ -98,6 +98,35 @@ sweep_thresholds.py
     sweep - NOT thres_fiducials and thres_score varied independently).
     alpha/beta held fixed at 0.25/0.75.
 
+rebuild_clean_features.py
+    Reconstructs Clean_Features_<subset>_<threshold>.h5 straight from a
+    sweep_thresholds.py dropped-signal JSON, without re-running the
+    checker - use when the pipeline's config changed (e.g. a threshold or
+    a check range) after a Clean_Features file was already produced, so
+    the file on disk needs to catch up. Overwrites IN PLACE (same
+    filename). Cross-checked against a live QualityChecker re-run before
+    being trusted (see git history / commit messages for that
+    validation).
+
+distribution_shift.py
+    Unifies what used to be two diverging scripts - Scripts/comparator.py
+    (raw Wasserstein, KS test, but fiducial-features-only) and
+    Scripts/bp_lgbm/Dataset_exploration.py (IQR-normalized Wasserstein,
+    but demographics/labels only got describe()-based summaries, not a
+    real distributional-distance metric). This one computes normalized
+    Wasserstein + KS (statistic D and p-value) + the reference IQR, pooled
+    (whole-column) only - no per-patient granularity, per the project
+    owner's decision - for BOTH the 28 PPG features AND the demographic/
+    label columns (Age, BMI, Height, Weight, SBP, DBP, MAP), since
+    segment-dropping affects all of them equally. Imports
+    preprocessing.median_impute_patientwise from Scripts/bp_lgbm/ via a
+    sys.path insert (temporary - repo-wide import/path cleanup happens in
+    one pass before publication, not per-script). Old scripts
+    (comparator.py + drivers, Dataset_exploration.py) are left in place,
+    superseded but not deleted. Outputs go to the OneDrive
+    Distribution_Analysis folder, not fiducial_quality_filtering/outputs/
+    - see OUTPUTS below.
+
 
 INPUTS (per subset, from PulseDB SupplementarySubsets folder)
 ---------------------------------------------------------------
@@ -178,6 +207,23 @@ per subset - see ASSUMPTIONS.txt for the exact path)
     this pipeline.
 
 
+DISTRIBUTION SHIFT OUTPUTS (written to the OneDrive Distribution_Analysis
+folder - .../2.LightGBM_SHAP/Distribution_Analysis)
+---------------------------------------------------------------------------
+
+shift_pooled_<subset>_<threshold>.csv
+    One row per column (28 PPG features + Age/BMI/Height/Weight/SBP/DBP/
+    MAP - 35 rows total), comparing the full original dataset against
+    Clean_Features_<subset>_<threshold>.h5: reference_q1/q3/iqr,
+    wasserstein, normalized_wasserstein (wasserstein / reference_iqr),
+    ks_statistic_D, ks_pvalue. See distribution_shift.py's docstring.
+
+legacy_50-180_bpm/
+    Every distribution-shift output produced before the bmin/bmax fix
+    (when the HR check used 50-180 instead of the correct 40-200) -
+    migrated here rather than deleted. Superseded by the files above.
+
+
 HOW TO RUN
 ----------
 
@@ -203,6 +249,16 @@ cache and does vectorized numpy - no per-signal loop):
 
 Edit ALPHA_GRID / THRESHOLD_GRID / FIXED_THRESHOLDS / FIXED_WEIGHTS at the
 top of those two scripts to change the grid or the held-fixed parameter.
+
+To rebuild Clean_Features_*.h5 from an existing threshold-sweep JSON
+(e.g. after a config fix, without re-running the checker):
+
+    ..\..\.venv310\Scripts\python.exe rebuild_clean_features.py
+
+To (re)generate the distribution-shift CSVs (fast - loads Features_*.h5 +
+Clean_Features_*.h5 directly, no cache/checker involved):
+
+    ..\..\.venv310\Scripts\python.exe distribution_shift.py
 
 
 WRITING YOUR OWN SWEEP (a genuine alpha x beta x threshold grid, a
