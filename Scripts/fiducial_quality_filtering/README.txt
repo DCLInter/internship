@@ -216,7 +216,10 @@ shift_pooled_<subset>_<threshold>.csv
     MAP - 35 rows total), comparing the full original dataset against
     Clean_Features_<subset>_<threshold>.h5: reference_q1/q3/iqr,
     wasserstein, normalized_wasserstein (wasserstein / reference_iqr),
-    ks_statistic_D, ks_pvalue. See distribution_shift.py's docstring.
+    ks_statistic_D, ks_pvalue, pct_change_{mean,median,q1,q3,iqr,mad},
+    and IQR/MAD outlier counts/percentages before+after plus their
+    Jaccard overlap. See distribution_shift.py's docstring for exact
+    formulas and the positional-index caveat on the Jaccard numbers.
 
 legacy_50-180_bpm/
     Every distribution-shift output produced before the bmin/bmax fix

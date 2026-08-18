@@ -190,15 +190,17 @@ CLEAN_FEATURES REBUILD + DISTRIBUTION SHIFT UNIFICATION
     signals matches the JSON-reconstructed keep/drop decisions bit-for-
     bit.
 
-17. DISTRIBUTION-SHIFT SCOPE, PER PROJECT OWNER: unified
-    distribution_shift.py keeps ONLY the pooled (whole-column, all-
-    samples) granularity from the old comparator.py. The per-patient and
-    per-patient-median granularities, and the IQR/MAD outlier detection +
-    Jaccard overlap analysis, were NOT ported (the KS test itself IS
-    kept - statistic D + p-value - just at pooled granularity only). If
-    you want the dropped pieces back, comparator.py's logic is the
-    reference (see its byPatient/byFeature_medians/byFeature_all
-    methods) - nothing was deleted from comparator.py itself.
+17. DISTRIBUTION-SHIFT SCOPE, PER PROJECT OWNER (revised after initial
+    misread - see commit history): unified distribution_shift.py keeps
+    ONLY the pooled (whole-column, all-samples) granularity from the old
+    comparator.py - the per-patient and per-patient-median granularities
+    were dropped. Everything ELSE comparator.py computed at pooled
+    granularity IS kept/ported: %-change of mean/median/Q1/Q3/IQR/MAD, KS
+    test (statistic D + p-value), and IQR/MAD outlier detection + Jaccard
+    overlap of the outlier sets. If you want the per-patient granularities
+    back, comparator.py's logic is the reference (see its byPatient/
+    byFeature_medians methods) - nothing was deleted from comparator.py
+    itself.
 
 18. DEMOGRAPHIC/LABEL COLUMNS NOW GET REAL SHIFT METRICS: Age, BMI,
     Height, Weight, SBP, DBP, MAP are analyzed with the exact same
