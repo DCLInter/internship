@@ -9,9 +9,10 @@
 # is reconstructed here from the two per-model Distribution_{target}.csv      #
 # files under Bootstrap_Filtering/, which are row-aligned by construction     #
 # (Experiment_Bootstrap_Filtering.py allocates one `resamples` list and       #
-# reuses it for both models in the same loop). Reconstructing this way and    #
-# taking the 2.5th/97.5th percentiles reproduces the manuscript's published   #
-# 95% CIs exactly — checked below as a sanity gate before anything is saved.  #
+# reuses it for both models in the same loop).                                #
+#                                                                              #
+# Statistics (CI / MDE / equivalence) come from bootstrap_stats.py, shared    #
+# with Sweep_Threshold_ML.py.                                                 #
 #                                                                              #
 # Saves:                                                                      #
 #   Bootstrap_Filtering/MDE_Equivalence_Filtering.csv                         #
@@ -21,21 +22,10 @@ import numpy as np
 import pandas as pd
 
 from local_paths import PERFORMANCE_RESULTS_PAPER
+from bootstrap_stats import paired_diff_stats
 
 TARGETS  = ["SBP", "DBP", "MAP"]
 CONTRAST = "filtered_vs_unfiltered"
-
-Z_MDE       = 2.8    # (1.96 + 0.84), two-sided alpha=0.05, 80% power
-EQUIV_DELTA = 2.0     # equivalence margin, pp of R2, declared a priori
-
-# Manuscript-reported 95% CIs for this contrast (pp of R2), used as a sanity
-# gate on the reconstructed paired-difference distribution.
-MANUSCRIPT_CI95_PP = {
-    "SBP": (-1.92, 1.21),
-    "DBP": (-1.62, 1.64),
-    "MAP": (-1.91, 1.36),
-}
-SANITY_TOL_PP = 0.02
 
 
 def load_point_r2(res_dir, target):
@@ -68,62 +58,16 @@ if __name__ == "__main__":
             - load_point_r2(res_root / "ppg_original", target)
         ) * 100.0
 
-        sd_pp  = float(np.std(diff_pp, ddof=1))
-        mde_pp = Z_MDE * sd_pp
-
-        ci95_lower_pp, ci95_upper_pp = np.percentile(diff_pp, [2.5, 97.5])
-        ci90_lower_pp, ci90_upper_pp = np.percentile(diff_pp, [5, 95])
-
-        equivalent = bool((ci90_lower_pp > -EQUIV_DELTA) and (ci90_upper_pp < EQUIV_DELTA))
+        stats = paired_diff_stats(diff_pp, observed_diff_pp)
 
         rows.append({
-            "contrast":        CONTRAST,
-            "target":          target,
-            "observed_diff_pp": observed_diff_pp,
-            "sd_pp":           sd_pp,
-            "mde_pp":          mde_pp,
-            "ci95_lower_pp":   float(ci95_lower_pp),
-            "ci95_upper_pp":   float(ci95_upper_pp),
-            "ci90_lower_pp":   float(ci90_lower_pp),
-            "ci90_upper_pp":   float(ci90_upper_pp),
-            "equivalent":      equivalent,
+            "contrast": CONTRAST,
+            "target":   target,
+            **stats,
         })
 
     result_df = pd.DataFrame(rows)
 
-    # =========================================================
-    # Sanity checks — stop before saving if any fail
-    # =========================================================
-    for row in rows:
-        target = row["target"]
-        man_lo, man_hi = MANUSCRIPT_CI95_PP[target]
-        d_lo = abs(row["ci95_lower_pp"] - man_lo)
-        d_hi = abs(row["ci95_upper_pp"] - man_hi)
-        if d_lo > SANITY_TOL_PP or d_hi > SANITY_TOL_PP:
-            raise RuntimeError(
-                f"SANITY CHECK FAILED ({target}): reconstructed 95% CI "
-                f"[{row['ci95_lower_pp']:.2f}, {row['ci95_upper_pp']:.2f}] pp "
-                f"does not match manuscript [{man_lo:.2f}, {man_hi:.2f}] pp "
-                f"(tol={SANITY_TOL_PP} pp)."
-            )
-
-        ci95_width = row["ci95_upper_pp"] - row["ci95_lower_pp"]
-        ci90_width = row["ci90_upper_pp"] - row["ci90_lower_pp"]
-        if not (ci90_width < ci95_width):
-            raise RuntimeError(
-                f"SANITY CHECK FAILED ({target}): 90% CI width ({ci90_width:.3f} pp) "
-                f"is not strictly narrower than 95% CI width ({ci95_width:.3f} pp)."
-            )
-
-        if not (row["mde_pp"] > 0):
-            raise RuntimeError(f"SANITY CHECK FAILED ({target}): MDE is not positive.")
-
-    print("Sanity checks passed: reconstructed 95% CIs match manuscript values, "
-          "90% CIs are narrower than 95% CIs, all MDEs are positive.\n")
-
-    # =========================================================
-    # Save + print
-    # =========================================================
     out_path = res_root / "MDE_Equivalence_Filtering.csv"
     result_df.to_csv(out_path, index=False)
     print(f"Saved: {out_path}")
