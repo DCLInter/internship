@@ -16,6 +16,7 @@ matplotlib
 seaborn
 plotly  # if you want interactive plots
 tqdm    # for progress bars
+adjustText  # auto-avoiding label placement for labeled scatter figures
 
 # Data formats
 h5py
